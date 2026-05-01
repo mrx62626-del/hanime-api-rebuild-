@@ -1,33 +1,21 @@
 // ─── Format / Transform Helpers ───────────────────────────────────────────────
-// These functions receive a Cheerio root ($) + element and return plain objects.
-
 import { clean, extractId, extractWatchId, parseTicks } from "../util/helper.js";
 import { BASE_URL } from "../config/baseurl.js";
 
 // ── Film Card (used on home, search, category, genre, etc.) ───────────────────
-
-/**
- * Parse a standard `.flw-item` film card into a compact anime object.
- */
 export function formatFilmCard($item, $) {
   const poster  = $item.find(".film-poster");
   const detail  = $item.find(".film-detail");
   const anchor  = detail.find("a.d-title");
   const href    = anchor.attr("href") || "";
-
   const id      = extractId(href);
   const watchHref = poster.find("a").first().attr("href") || "";
-
-  // Fix: prevent duplicate base URL if watchHref is already absolute
+  
   let watchUrl = null;
   if (watchHref) {
-    if (watchHref.startsWith("http")) {
-      watchUrl = watchHref;
-    } else {
-      watchUrl = `${BASE_URL}${watchHref}`;
-    }
+    watchUrl = watchHref.startsWith("http") ? watchHref : `${BASE_URL}${watchHref}`;
   }
-
+  
   return {
     id,
     name:      clean(anchor.text()),
@@ -42,15 +30,11 @@ export function formatFilmCard($item, $) {
 }
 
 // ── Spotlight / Hero Slider (home page) ───────────────────────────────────────
-
-/**
- * Parse a `.deslide-item` hero spotlight card.
- */
 export function formatSpotlight($item, $, rank) {
   const anchor  = $item.find("a.desi-buttons").first();
   const href    = $item.find(".desi-buttons").first().attr("href") || anchor.attr("href") || "";
   const nameEl  = $item.find(".desi-head-title");
-
+  
   return {
     rank,
     id:          extractWatchId(href),
@@ -63,17 +47,16 @@ export function formatSpotlight($item, $, rank) {
     duration:    clean($item.find(".scd-item").eq(1).text()),
     rating:      clean($item.find(".quality").text()) || null,
     episodes: {
-      sub: parseInt($item.find(".tick-sub").text(), 10) || null,
-      dub: parseInt($item.find(".tick-dub").text(), 10) || null,
+      sub: parseInt($item.find(".tick-sub").text(), 10) || null,      dub: parseInt($item.find(".tick-dub").text(), 10) || null,
     },
   };
 }
 
 // ── Trending Item (home page sidebar charts) ───────────────────────────────────
-
 export function formatTrendingItem($item, $, rank) {
   const anchor = $item.find("a").first();
   const href   = anchor.attr("href") || "";
+  
   return {
     rank,
     id:     extractId(href),
@@ -84,16 +67,18 @@ export function formatTrendingItem($item, $, rank) {
 }
 
 // ── Anime Info Page ────────────────────────────────────────────────────────────
-
-/**
- * Extract the structured metadata from the `.anisc-info` section.
- */
 export function formatAnimeInfo($, id) {
   const get = (head) => {
     let val = null;
     $(".anisc-info .item").each((_, el) => {
-      if ($(el).find(".item-head").text().trim().startsWith(head)) {
+      const headText = $(el).find(".item-head").text().trim();
+      if (headText.startsWith(head)) {
+        // Try standard selectors first
         val = clean($(el).find(".name, .text, a").first().text());
+        // Fallback: grab direct text nodes after the header
+        if (!val) {
+          val = clean($(el).contents().filter((i, n) => n.nodeType === 3).text());
+        }
       }
     });
     return val;
@@ -103,25 +88,31 @@ export function formatAnimeInfo($, id) {
     const items = [];
     $(".anisc-info .item").each((_, el) => {
       if ($(el).find(".item-head").text().trim().startsWith(head)) {
-        $(el).find("a").each((_, a) => items.push(clean($(a).text())));
+        $(el).find("a").each((_, a) => {
+          const txt = clean($(a).text());
+          if (txt) items.push(txt);
+        });
       }
     });
     return items;
   };
+  const nameEl = $(".dynamic-name, .film-name").first();
+  const posterEl = $(".film-poster img").first();
+  const descEl = $(".description-content .text, #synopsis-content .text, .film-description").first();
 
   return {
     id,
-    name:        clean($(".film-name.dynamic-name").text()),
-    jname:       $(".film-name.dynamic-name").attr("data-jname") || null,
-    poster:      $(".film-poster img").first().attr("data-src") || null,
-    description: clean($("#synopsis-content, .film-description .text").first().text()),
-    type:        clean($(".film-stats .tick-item.tick-quality").parent().prev().text()),
+    name:        clean(nameEl.text()),
+    jname:       nameEl.attr("data-jname") || nameEl.attr("data-jp") || null,
+    poster:      posterEl.attr("data-src") || posterEl.attr("src") || null,
+    description: clean(descEl.text()),
+    type:        clean($(".film-stats .tick-rate").text()) || clean($(".film-stats .tick").first().text()) || "",
     status:      get("Status"),
-    rating:      clean($(".tick-pg").first().text()) || null,
-    quality:     clean($(".tick-quality").first().text()) || null,
+    rating:      clean($(".film-stats .tick-pg").text()) || null,
+    quality:     clean($(".film-stats .tick-quality").text()) || null,
     episodes: {
-      sub: parseInt($(".tick-sub").first().text(), 10) || null,
-      dub: parseInt($(".tick-dub").first().text(), 10) || null,
+      sub: parseInt(clean($(".film-stats .tick-sub").text()), 10) || null,
+      dub: parseInt(clean($(".film-stats .tick-dub").text()), 10) || null,
     },
     duration:    get("Duration"),
     premiered:   get("Premiered"),
@@ -136,34 +127,28 @@ export function formatAnimeInfo($, id) {
 }
 
 // ── Episode List ───────────────────────────────────────────────────────────────
-
-/**
- * Parse a single episode `<a>` or `<div>` item from the AJAX episode list.
- */
 export function formatEpisode($ep, $) {
   return {
     number:    parseInt($ep.attr("data-number"), 10) || null,
-    id:        $ep.attr("data-id") || null,         // numeric episode ID
+    id:        $ep.attr("data-id") || null,
     slug:      clean($ep.attr("title") || $ep.find(".ssli-detail .ep-name").text()),
     isFiller:  $ep.hasClass("ssl-item-filler"),
   };
 }
 
 // ── Server Item ────────────────────────────────────────────────────────────────
-
 export function formatServer($el, $) {
   return {
-    serverId:   $el.attr("data-id")     || null,
+    serverId:   $el.attr("data-id") || null,
     serverName: clean($el.find("a").text()),
-    type:       $el.attr("data-type")   || null,    // "sub" | "dub" | "raw"
+    type:       $el.attr("data-type") || null,
   };
 }
 
-// ── Search Result Item ─────────────────────────────────────────────────────────
-
-export function formatSearchSuggestion($item, $) {
+// ── Search Result Item ─────────────────────────────────────────────────────────export function formatSearchSuggestion($item, $) {
   const href   = $item.find("a").attr("href") || "";
   const poster = $item.find("img").attr("src") || $item.find("img").attr("data-src") || null;
+  
   return {
     id:     extractId(href),
     name:   clean($item.find(".title, .film-name").text()),
@@ -174,15 +159,11 @@ export function formatSearchSuggestion($item, $) {
 }
 
 // ── Genre / Category Pagination ────────────────────────────────────────────────
-
-/**
- * Extract total pages from a pagination element.
- */
 export function parseTotalPages($) {
   const last = $(".pre-pagination .page-item:last-child a, [title='Last']").attr("href") || "";
   const match = last.match(/page=(\d+)/);
   if (match) return parseInt(match[1], 10);
-  // fallback: count page items
+  
   const items = $(".pre-pagination .page-item a").length;
   return items > 0 ? items : 1;
 }
