@@ -19,7 +19,7 @@ export const URLS = {
 
   // Anime detail
   animeInfo:  (id)  => `${BASE}/anime/${id}`,
-  animeWatch: (id)  => `${BASE}/${id}`,
+  animeWatch: (id)  => `${BASE}/watch/${id}`,
 
   // Lists & browsing
   category:  (name, page = 1) => `${BASE}/${name}?page=${page}`,
