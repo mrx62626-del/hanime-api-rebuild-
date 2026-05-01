@@ -1,7 +1,7 @@
 <p align="center">
     <a href="https://github.com/senpaiorbit/hanime-api-rebuild-">
         <img 
-            src="https://raw.githubusercontent.com/SKS-WEBDEV/animelokam/refs/heads/main/public/img/hianime_v2.png" 
+            src="https://w7.pngwing.com/pngs/330/89/png-transparent-anime-girl-chibi-anime-girl-blue-haired-girl-illustration-black-hair-cartoons-cartoon-thumbnail.png" 
             alt="hanime_logo" 
             width="175" 
             height="175"
