@@ -93,7 +93,10 @@ export function formatAnimeInfo($, id) {
     let val = null;
     $(".anisc-info .item").each((_, el) => {
       if ($(el).find(".item-head").text().trim().startsWith(head)) {
-        val = clean($(el).find(".name, .text, a").first().text());
+        // Prefer <a class="name"> then <span class="name"> then .text
+        const byName = $(el).find(".name").first().text();
+        const byText = $(el).find(".text").first().text();
+        val = clean(byName || byText) || null;
       }
     });
     return val;
@@ -103,25 +106,57 @@ export function formatAnimeInfo($, id) {
     const items = [];
     $(".anisc-info .item").each((_, el) => {
       if ($(el).find(".item-head").text().trim().startsWith(head)) {
-        $(el).find("a").each((_, a) => items.push(clean($(a).text())));
+        // Collect from <a> tags; fall back to <span class="name"> plain text split by comma
+        const anchors = $(el).find("a");
+        if (anchors.length > 0) {
+          anchors.each((_, a) => {
+            const t = clean($(a).text());
+            if (t) items.push(t);
+          });
+        } else {
+          // Fallback: plain text value from span.name (comma-separated)
+          const raw = clean($(el).find(".name").text());
+          if (raw) raw.split(",").forEach((s) => { const t = s.trim(); if (t) items.push(t); });
+        }
       }
     });
     return items;
   };
 
+  // --- poster: try data-src first (lazy-load), then src (static/SSR)
+  const posterEl = $(".anisc-poster .film-poster img, .anisc-content .film-poster img").first();
+  const poster =
+    posterEl.attr("data-src") ||
+    posterEl.attr("src") ||
+    null;
+
+  // --- description: try dedicated synopsis div, then the .film-description .text block
+  const description = clean(
+    $("#synopsis-content").text() ||
+    $(".film-description .text").first().text() ||
+    $(".anisc-info .item .text").first().text()
+  ) || null;
+
+  // --- type: it's the first <span class="item"> inside .film-stats .tick (after the tick-items)
+  const type = clean($(".film-stats .tick .item").first().text()) || null;
+
+  // --- episodes: strip icon element text before parsing number
+  const subText = $(".anisc-content .tick-sub").first().clone().children("i").remove().end().text();
+  const dubText = $(".anisc-content .tick-dub").first().clone().children("i").remove().end().text();
+
   return {
     id,
     name:        clean($(".film-name.dynamic-name").text()),
     jname:       $(".film-name.dynamic-name").attr("data-jname") || null,
-    poster:      $(".film-poster img").first().attr("data-src") || null,
-    description: clean($("#synopsis-content, .film-description .text").first().text()),
-    type:        clean($(".film-stats .tick-item.tick-quality").parent().prev().text()),
+    poster,
+    description,
+    type,
     status:      get("Status"),
-    rating:      clean($(".tick-pg").first().text()) || null,
-    quality:     clean($(".tick-quality").first().text()) || null,
+    rating:      clean($(".anisc-content .tick-pg").first().text()) || null,
+    quality:     clean($(".anisc-content .tick-quality").first().text()) || null,
     episodes: {
-      sub: parseInt($(".tick-sub").first().text(), 10) || null,
-      dub: parseInt($(".tick-dub").first().text(), 10) || null,
+      sub: parseInt(subText.trim(), 10) || null,
+      dub: parseInt(dubText.trim(), 10) || null,
     },
     duration:    get("Duration"),
     premiered:   get("Premiered"),
