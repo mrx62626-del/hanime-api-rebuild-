@@ -1,7 +1,7 @@
 // ─── HiAnime Scraper ─────────────────────────────────────────────────────────
 
 import * as cheerio from "cheerio";
-import { fetchPage, fetchJSON, clean, extractId, extractWatchId } from "../util/helper.js";
+import { fetchPage, fetchHTML, fetchJSON, clean, extractId, extractWatchId } from "../util/helper.js";
 import {
   formatFilmCard,
   formatSpotlight,
@@ -135,8 +135,7 @@ export async function scrapeSearch(query, page = 1, filters = {}) {
 // ── Search Suggestions ────────────────────────────────────────────────────────
 
 export async function scrapeSearchSuggestions(query) {
-  const data = await fetchJSON(URLS.searchSuggest(query));
-  const html = data.html || "";
+  const html = await fetchHTML(URLS.searchSuggest(query));
   const $ = cheerio.load(html);
 
   const suggestions = [];
@@ -149,20 +148,6 @@ export async function scrapeSearchSuggestions(query) {
 }
 
 // ── Anime Info (full detail page) ─────────────────────────────────────────────
-//
-// Selector notes vs the real HTML:
-//
-//  mostPopularAnimes:
-//    Lives in .block_area-realtime > .cbox-realtime > .cbox-content > .anif-block-ul > ul.ulclear > li
-//    Use the broad selector ".cbox-realtime li" — matches every <li> in the sidebar.
-//
-//  recommendedAnimes:
-//    Lives in .block_area_category .film_list-wrap .flw-item
-//    The grid can be empty on page load (server-side rendered empty div) — we still
-//    try to parse; if empty the array will just be [].
-//
-//  All other data (info, moreInfo, seasons, promotionalVideos, characterVoiceActor,
-//  relatedAnimes) is the same as before.
 
 export async function scrapeAnimeInfo(animeId) {
   const html = await fetchPage(URLS.animeInfo(animeId));
@@ -170,14 +155,11 @@ export async function scrapeAnimeInfo(animeId) {
 
   const { info, moreInfo, seasons: pageSeason } = formatAnimeInfo($, animeId);
 
-  // ── Recommended: .block_area_category section grid ────────────────────────
   const recommendedAnimes = [];
   $(".block_area_category .flw-item").each((_, el) =>
     recommendedAnimes.push(formatRecommendedAnime($(el), $))
   );
 
-  // ── Most Popular: sidebar trending list ───────────────────────────────────
-  // Match both possible containers (.cbox-realtime li AND .block_area-realtime .anif-block-ul li)
   const mostPopularAnimes = [];
   const seenIds = new Set();
   $(".cbox-realtime li, .block_area-realtime .anif-block-ul li").each((_, el) => {
@@ -188,17 +170,20 @@ export async function scrapeAnimeInfo(animeId) {
     }
   });
 
-  // ── Resolve numeric id for AJAX calls ─────────────────────────────────────
-  // Prefer the data-id on #main-wrapper (watch page) or #ani_detail
-  let numericId = $("#main-wrapper").attr("data-id") ||
-                  $("#ani_detail").attr("data-id") ||
-                  null;
+  // ── Resolve numeric id ────────────────────────────────────────────────────
+  // The anime detail page embeds it in the favourite button element.
+  // Both watch.html and anime.html have: .pc-item.pc-fav[data-id] and
+  // .favourite[data-fetch="true"][data-id]
+  let numericId =
+    $("#main-wrapper").attr("data-id") ||
+    $(".pc-item.pc-fav[data-id]").attr("data-id") ||
+    $(".favourite[data-fetch='true']").attr("data-id") ||
+    null;
 
   if (!numericId) {
     numericId = await scrapeAnimeNumericId(animeId).catch(() => null);
   }
 
-  // ── AJAX calls (all gracefully degraded) ─────────────────────────────────
   const [relatedAnimes, promotionalVideos, characterVoiceActor, ajaxSeasons] =
     await Promise.all([
       numericId ? scrapeRelatedAnimes(numericId).catch(() => []) : [],
@@ -223,22 +208,20 @@ export async function scrapeAnimeInfo(animeId) {
   };
 }
 
-// ── AJAX: Related Animes ──────────────────────────────────────────────────────
+// ── HTML-scrape: Related Animes ───────────────────────────────────────────────
 
 export async function scrapeRelatedAnimes(numericId) {
-  const data = await fetchJSON(`${BASE_URL}/ajax/anime/related?id=${numericId}`);
-  const html = data.html || "";
+  const html = await fetchHTML(`${BASE_URL}/ajax/anime/related?id=${numericId}`);
   const $ = cheerio.load(html);
   const related = [];
   $(".flw-item").each((_, el) => related.push(formatRelatedAnime($(el), $)));
   return related;
 }
 
-// ── AJAX: Promotional Videos ──────────────────────────────────────────────────
+// ── HTML-scrape: Promotional Videos ──────────────────────────────────────────
 
 export async function scrapePromoVideos(numericId) {
-  const data = await fetchJSON(`${BASE_URL}/ajax/anime/videos?id=${numericId}`);
-  const html = data.html || data.promo || "";
+  const html = await fetchHTML(`${BASE_URL}/ajax/anime/videos?id=${numericId}`);
   const $ = cheerio.load(html);
   const videos = [];
 
@@ -252,11 +235,10 @@ export async function scrapePromoVideos(numericId) {
   return videos;
 }
 
-// ── AJAX: Character + Voice Actors ───────────────────────────────────────────
+// ── HTML-scrape: Character + Voice Actors ─────────────────────────────────────
 
 export async function scrapeCharacterVoiceActors(numericId) {
-  const data = await fetchJSON(`${BASE_URL}/ajax/character/list/${numericId}`);
-  const html = data.html || "";
+  const html = await fetchHTML(`${BASE_URL}/ajax/character/list/${numericId}`);
   const $ = cheerio.load(html);
   const cast = [];
 
@@ -285,11 +267,10 @@ export async function scrapeCharacterVoiceActors(numericId) {
   return cast;
 }
 
-// ── AJAX: Seasons ─────────────────────────────────────────────────────────────
+// ── HTML-scrape: Seasons ──────────────────────────────────────────────────────
 
 export async function scrapeSeasons(numericId) {
-  const data = await fetchJSON(`${BASE_URL}/ajax/anime/season/list/${numericId}`);
-  const html = data.html || "";
+  const html = await fetchHTML(`${BASE_URL}/ajax/anime/season/list/${numericId}`);
   const $ = cheerio.load(html);
   const seasons = [];
 
@@ -308,35 +289,81 @@ export async function scrapeSeasons(numericId) {
   return seasons;
 }
 
-// ── Resolve Numeric ID from watch page ────────────────────────────────────────
+// ── Resolve Numeric ID ────────────────────────────────────────────────────────
+//
+// Strategy (cheapest-first to avoid extra requests):
+//   1. Try /anime/:slug page → .pc-item.pc-fav[data-id] OR .favourite[data-fetch][data-id]
+//      (confirmed present in anime.html at line 155: data-id="1057" data-fetch="true")
+//   2. Try /watch/:slug page → #main-wrapper[data-id]
+//      (confirmed present in watch.html at line 119: data-id="1057")
 
 export async function scrapeAnimeNumericId(slug) {
+  // ── Pass 1: anime detail page ──────────────────────────────────────────────
+  try {
+    const html = await fetchPage(URLS.animeInfo(slug));
+    const $    = cheerio.load(html);
+
+    const id =
+      $(".pc-item.pc-fav[data-id]").attr("data-id") ||
+      $(".favourite[data-fetch='true']").attr("data-id") ||
+      $("#main-wrapper").attr("data-id") ||
+      null;
+
+    if (id) return id;
+  } catch (_) {
+    // Fall through to watch page
+  }
+
+  // ── Pass 2: watch page ─────────────────────────────────────────────────────
   const html = await fetchPage(URLS.animeWatch(slug));
-  const $ = cheerio.load(html);
-  const id = $("#main-wrapper").attr("data-id");
+  const $    = cheerio.load(html);
+
+  const id =
+    $("#main-wrapper").attr("data-id") ||
+    $(".pc-item.pc-fav[data-id]").attr("data-id") ||
+    $(".favourite[data-fetch='true']").attr("data-id") ||
+    null;
+
   if (!id) throw new Error(`Could not resolve numeric ID for: ${slug}`);
   return id;
 }
 
-// ── Episodes ──────────────────────────────────────────────────────────────────
+// ── Episodes — pure HTML scraping, no browser AJAX ────────────────────────────
+//
+// The site exposes /ajax/v2/episode/list/{numericId} which returns JSON:
+//   { status: true, html: "<div class='ss-list'>…</div>" }
+//
+// We fetch that URL server-side (no jQuery, no browser), extract the "html"
+// string from the JSON, then run Cheerio on it to parse .ssl-item nodes.
+// Each node carries:
+//   data-number  → episode number
+//   data-id      → episodeId  (e.g. "steinsgate-3?ep=213")
+//   class        → includes "ssl-item-filler" when it is a filler episode
+//   .ep-name     → episode title
 
-export async function scrapeEpisodes(animeId) {
-  const data = await fetchJSON(URLS.episodes(animeId));
-  const html = data.html || "";
-  const $ = cheerio.load(html);
+export async function scrapeEpisodes(numericId) {
+  const html = await fetchHTML(URLS.episodes(numericId));
+  const $    = cheerio.load(html);
 
   const episodes = [];
-  $(".ssl-item").each((_, el) => episodes.push(formatEpisode($(el), $)));
+  // Both .ssl-item and .ssl-item.ep-item appear in different page versions
+  $(".ssl-item.ep-item, .ssl-item").each((_, el) => {
+    const ep = formatEpisode($(el), $);
+    // Only push items that have a valid episode number
+    if (ep.number !== null) episodes.push(ep);
+  });
 
-  return { animeId, totalEpisodes: episodes.length, episodes };
+  return {
+    totalEpisodes: episodes.length,
+    episodes,
+  };
 }
 
 // ── Episode Servers ───────────────────────────────────────────────────────────
 
 export async function scrapeEpisodeServers(episodeId) {
-  const data = await fetchJSON(URLS.episodeServers(episodeId));
-  const html = data.html || "";
-  const $ = cheerio.load(html);
+  const html = await fetchHTML(URLS.episodeServers(episodeId));
+  const $    = cheerio.load(html);
 
   const parse = (selector) => {
     const list = [];
@@ -407,9 +434,8 @@ export async function scrapeAZList(sortOption = "all", page = 1) {
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
 export async function scrapeSchedule(date) {
-  const data = await fetchJSON(URLS.schedule(date));
-  const html = data.html || "";
-  const $ = cheerio.load(html);
+  const html = await fetchHTML(URLS.schedule(date));
+  const $    = cheerio.load(html);
 
   const scheduled = [];
   $(".ssl-item, li[data-id]").each((_, el) => {
@@ -427,9 +453,8 @@ export async function scrapeSchedule(date) {
 // ── Qtip ─────────────────────────────────────────────────────────────────────
 
 export async function scrapeQtip(animeId) {
-  const data = await fetchJSON(URLS.qtip(animeId));
-  const html = data.html || "";
-  const $ = cheerio.load(html);
+  const html = await fetchHTML(URLS.qtip(animeId));
+  const $    = cheerio.load(html);
 
   return {
     animeId,

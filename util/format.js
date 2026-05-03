@@ -121,24 +121,14 @@ export function formatTop10Item($item, $, rank) {
 }
 
 // ── Most Popular Anime (trending sidebar on anime detail page) ────────────────
-// HTML (from actual page):
-//   .cbox-realtime ul.ulclear > li
-//     > .film-poster[data-tip] > img[data-src]
-//     + .film-detail > h3.film-name > a.d-title[href][data-jp]
-//                    + .fd-infor > span.fdi-item (type) + span.dot
-//                                + span.fdi-item ("12 Eps") + span.dot
-//                                + span.fdi-item.fdi-duration ("24 MIN min")
-
 export function formatMostPopular($item, $) {
   const anchor = $item.find("a.d-title, .film-name a").first();
   const href   = anchor.attr("href") || "";
   const poster = $item.find("img").attr("data-src") || $item.find("img").attr("src") || null;
 
-  // Episode count: second .fdi-item is "N Eps"
   const epsRaw = clean($item.find(".fdi-item").eq(1).text()).replace(/[^\d]/g, "");
   const eps    = parseInt(epsRaw, 10) || null;
 
-  // sub/dub tick counts (icon + number in same span)
   const subRaw = $item.find(".tick-sub").first().clone().children("i").remove().end().text().trim();
   const dubRaw = $item.find(".tick-dub").first().clone().children("i").remove().end().text().trim();
   const sub    = parseInt(subRaw, 10) || eps || null;
@@ -155,34 +145,7 @@ export function formatMostPopular($item, $) {
 }
 
 // ── Anime Info Page ────────────────────────────────────────────────────────────
-// HTML structure (from anime.html):
-//
-//   .anis-content
-//     > .anisc-poster > .film-poster > img.film-poster-img[src]   ← poster
-//     + .anisc-detail
-//         > h2.film-name.dynamic-name[data-jname]                 ← name / jname
-//         + .film-stats > .tick
-//             > .tick-item.tick-pg                                 ← rating "PG 13"
-//             + .tick-item.tick-quality                            ← quality "HD"
-//             + .tick-item.tick-sub > i + " N"                    ← sub ep count
-//             + .tick-item.tick-dub > i + " N"                    ← dub ep count
-//             + span.dot + span.item                              ← type "TV"
-//             + span.dot + span.item                              ← duration "24m"
-//         + .film-description > .text                             ← description
-//
-//   .anisc-info-wrap > .anisc-info
-//     > .item .item-head "Japanese:" + .name                      ← jname fallback
-//     + .item .item-head "Aired:"    + .name                      ← aired
-//     + .item .item-head "Premiered:" + a.name                    ← premiered
-//     + .item .item-head "Duration:" + .name                      ← duration
-//     + .item .item-head "Status:"   + a.name                     ← status
-//     + .item .item-head "MAL Score:" + .name                     ← malscore
-//     + .item .item-head "Genres:"   + [a,a,…]                   ← genres[]
-//     + .item .item-head "Studios:"  + [a,a,…]                   ← studios[]
-//     + .item .item-head "Producers:" + [a,a,…]                  ← producers[]
-
 export function formatAnimeInfo($, id) {
-  // ── Row reader helpers ─────────────────────────────────────────────────────
   const get = (head) => {
     let val = null;
     $(".anisc-info .item").each((_, el) => {
@@ -206,7 +169,6 @@ export function formatAnimeInfo($, id) {
           const t = clean($(a).text());
           if (t) items.push(t);
         });
-        // Some rows use bare .name spans instead of <a>
         if (!items.length) {
           $(el).find(".name").each((__, n) => {
             const t = clean($(n).text());
@@ -218,19 +180,14 @@ export function formatAnimeInfo($, id) {
     return items;
   };
 
-  // ── Name & jname ───────────────────────────────────────────────────────────
   const nameEl = $(".anisc-detail .film-name, .anisc-detail h2.film-name").first();
   const name   = clean(nameEl.text()) || null;
-  // data-jname is on the element (hianime uses data-jname, older pages data-jp)
   const jname  = nameEl.attr("data-jname") || nameEl.attr("data-jp") || null;
 
-  // ── Stats from .film-stats .tick ───────────────────────────────────────────
   const statsEl = $(".anisc-detail .film-stats .tick");
-
   const rating  = clean(statsEl.find(".tick-pg").text()) || null;
   const quality = clean(statsEl.find(".tick-quality").text()) || null;
 
-  // Strip the <i> icon child before reading the text number
   const subEps = parseInt(
     statsEl.find(".tick-sub").clone().children("i").remove().end().text().trim(), 10
   ) || null;
@@ -238,7 +195,6 @@ export function formatAnimeInfo($, id) {
     statsEl.find(".tick-dub").clone().children("i").remove().end().text().trim(), 10
   ) || null;
 
-  // span.item nodes carry type + duration (after the dots)
   const itemSpans = [];
   statsEl.find("span.item").each((_, el) => {
     const t = clean($(el).text());
@@ -247,8 +203,6 @@ export function formatAnimeInfo($, id) {
   const statType     = itemSpans[0] || null;
   const statDuration = itemSpans[1] || get("Duration") || null;
 
-  // ── Poster ─────────────────────────────────────────────────────────────────
-  // The page has img.film-poster-img with src= (not lazy-loaded on detail page)
   const poster =
     $(".anis-content .film-poster img").attr("data-src") ||
     $(".anis-content .film-poster img").attr("src") ||
@@ -256,7 +210,6 @@ export function formatAnimeInfo($, id) {
     $(".anisc-poster img").attr("src") ||
     null;
 
-  // ── Description ────────────────────────────────────────────────────────────
   const description = clean($(".film-description .text").text()) || null;
 
   const info = {
@@ -268,14 +221,10 @@ export function formatAnimeInfo($, id) {
     stats: {
       rating,
       quality,
-      episodes: {
-        sub: subEps,
-        dub: dubEps,
-      },
+      episodes: { sub: subEps, dub: dubEps },
       type:     statType,
       duration: statDuration,
     },
-    // Filled later by scraper AJAX calls
     promotionalVideos:   [],
     characterVoiceActor: [],
   };
@@ -291,7 +240,6 @@ export function formatAnimeInfo($, id) {
     producers: getList("Producer"),
   };
 
-  // ── Seasons embedded on the page (.os-list .os-item) ──────────────────────
   const seasons = [];
   $(".os-list .os-item, .os-list a.os-item").each((_, el) => {
     const $el  = $(el);
@@ -310,8 +258,6 @@ export function formatAnimeInfo($, id) {
 }
 
 // ── Recommended Anime ─────────────────────────────────────────────────────────
-// Spec: { id, name, poster, duration, type, rating, episodes: { sub, dub } }
-
 export function formatRecommendedAnime($item, $) {
   const poster = $item.find(".film-poster");
   const detail = $item.find(".film-detail");
@@ -337,8 +283,6 @@ export function formatRecommendedAnime($item, $) {
 }
 
 // ── Related Anime ─────────────────────────────────────────────────────────────
-// Spec: { id, name, poster, duration, type, rating, episodes: { sub, dub } }
-
 export function formatRelatedAnime($item, $) {
   const anchor = $item.find("a.d-title, .film-name a").first();
   const href   = anchor.attr("href") || "";
@@ -364,27 +308,47 @@ export function formatRelatedAnime($item, $) {
 }
 
 // ── Episode ───────────────────────────────────────────────────────────────────
+//
+// Scraped from .ssl-item nodes in the HTML fragment returned by
+// /ajax/v2/episode/list/{numericId}.
+//
+// Node attributes (verified against watch.html):
+//   data-number  → episode number  (e.g. "1")
+//   data-id      → episodeId       (e.g. "bleach-yaa9n?ep=213")
+//   class        → includes "ssl-item-filler" for filler episodes
+//
+// Child structure:
+//   a[href="/watch/bleach-yaa9n?ep=213"]
+//     > .ssli-detail > .ssli-order  (episode number fallback)
+//                    > .ep-name     (episode title)
 
 export function formatEpisode($item, $) {
-  // .ssl-item attributes:
-  //   data-number="1"
-  //   data-id="bleach-yaa9n?ep=213"  ← direct episodeId (most reliable)
-  //   class includes "ssl-item-filler" for filler episodes
-  // Child: a[href="/watch/bleach-yaa9n?ep=213"] > .ssli-detail > .ep-name
-  const dataId    = $item.attr("data-id") || "";
-  const href      = $item.find("a").first().attr("href") || "";
-  const episodeId = dataId || href.replace(/^.*\/watch\//, "").trim();
+  // Prefer data-id attribute — it's the canonical episodeId
+  const dataId = $item.attr("data-id") || "";
+  const href   = $item.find("a").first().attr("href") || "";
 
-  return {
-    number:    parseInt($item.attr("data-number"), 10) || null,
-    title:     clean($item.find(".ssli-detail .ep-name, .ep-name").text()) || null,
-    episodeId,
-    isFiller:  $item.hasClass("ssl-item-filler"),
-  };
+  // episodeId = "slug?ep=N" format (e.g. "bleach-yaa9n?ep=213")
+  const episodeId = dataId
+    ? dataId
+    : href.replace(/^.*\/watch\//, "").trim();
+
+  // Episode number: prefer data-number, fall back to .ssli-order text
+  const dataNumber = parseInt($item.attr("data-number"), 10);
+  const orderNum   = parseInt($item.find(".ssli-order").text().trim(), 10);
+  const number     = (!isNaN(dataNumber) && dataNumber > 0) ? dataNumber
+                   : (!isNaN(orderNum)   && orderNum   > 0) ? orderNum
+                   : null;
+
+  // Title
+  const title = clean($item.find(".ep-name, .ssli-detail .ep-name").text()) || null;
+
+  // Filler flag
+  const isFiller = $item.hasClass("ssl-item-filler");
+
+  return { number, title, episodeId, isFiller };
 }
 
 // ── Server ────────────────────────────────────────────────────────────────────
-
 export function formatServer($item, $) {
   return {
     serverId:   $item.attr("data-id") || null,
@@ -393,7 +357,6 @@ export function formatServer($item, $) {
 }
 
 // ── Search Suggestion ─────────────────────────────────────────────────────────
-
 export function formatSearchSuggestion($item, $) {
   const anchor = $item.find("a").first();
   const href   = anchor.attr("href") || $item.find("[href]").attr("href") || "";
@@ -407,7 +370,6 @@ export function formatSearchSuggestion($item, $) {
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
-
 export function parseTotalPages($) {
   const lastPage = $(".pagination .page-item:last-child a").attr("href") || "";
   const match    = lastPage.match(/page=(\d+)/);

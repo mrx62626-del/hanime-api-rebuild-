@@ -3,20 +3,53 @@
 import { CONFIG } from "../config/config.js";
 
 /**
- * Fetch a page's HTML from hianime with browser-like headers.
- * Throws on non-OK HTTP status.
+ * Fetch a full HTML page with browser-like headers.
+ * Used for: /anime/:slug, /watch/:slug, and any page that returns
+ * full HTML (not a JSON wrapper).
  */
-export async function fetchPage(url, ajax = false) {
-  const headers = ajax ? CONFIG.AJAX_HEADERS : CONFIG.REQUEST_HEADERS;
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    throw new Error(`Fetch failed [${res.status}]: ${url}`);
-  }
+export async function fetchPage(url) {
+  const res = await fetch(url, { headers: CONFIG.REQUEST_HEADERS });
+  if (!res.ok) throw new Error(`Fetch failed [${res.status}]: ${url}`);
   return res.text();
 }
 
 /**
- * Fetch JSON from an AJAX endpoint.
+ * Fetch an endpoint that returns JSON { html: "…" } or { status, html: "…" }
+ * and return the inner HTML string ready for Cheerio.
+ *
+ * This is the scraping alternative to jQuery/browser AJAX:
+ * we call the endpoint server-side and parse the HTML fragment ourselves.
+ *
+ * Falls back to treating the entire response body as HTML if no "html" key
+ * is present (some endpoints return raw HTML directly).
+ */
+export async function fetchHTML(url) {
+  const res = await fetch(url, { headers: CONFIG.AJAX_HEADERS });
+  if (!res.ok) throw new Error(`Fetch failed [${res.status}]: ${url}`);
+
+  const contentType = res.headers.get("content-type") || "";
+
+  // JSON wrapper: { html: "…" }  or  { status: true, html: "…" }
+  if (contentType.includes("application/json") || contentType.includes("text/json")) {
+    const data = await res.json();
+    return data.html || data.content || "";
+  }
+
+  // Try to parse as JSON anyway (some servers omit content-type)
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text);
+    return data.html || data.content || text;
+  } catch (_) {
+    // Response was raw HTML
+    return text;
+  }
+}
+
+/**
+ * Fetch JSON from an endpoint and return the parsed object.
+ * Only used for endpoints that return structured JSON data
+ * (e.g. episode sources which returns { type, server, link }).
  */
 export async function fetchJSON(url) {
   const res = await fetch(url, { headers: CONFIG.AJAX_HEADERS });
@@ -61,12 +94,13 @@ export function clean(str = "") {
  */
 export function errorResponse(message, status = 500) {
   return Response.json(
-    { status, error: message, data: null },
+    { success: false, data: null, error: message },
     {
       status,
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
       },
     }
   );
@@ -84,7 +118,7 @@ export function jsonResponse(data, ttl = 0) {
       : "no-store";
 
   return Response.json(
-    { status: 200, data },
+    { success: true, data },
     {
       status: 200,
       headers: {
