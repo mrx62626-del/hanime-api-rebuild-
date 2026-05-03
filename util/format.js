@@ -35,9 +35,10 @@ export function formatFilmCard($item, $) {
 // ── Spotlight / Hero Slider ────────────────────────────────────────────────────
 
 export function formatSpotlight($item, $, rank) {
-  const anchor  = $item.find("a.desi-buttons").first();
-  const href    = $item.find(".desi-buttons").first().attr("href") || anchor.attr("href") || "";
-  const nameEl  = $item.find(".desi-head-title");
+  // The "Watch Now" button is the first <a> inside .desi-buttons
+  const watchAnchor = $item.find(".desi-buttons a").first();
+  const href        = watchAnchor.attr("href") || "";
+  const nameEl      = $item.find(".desi-head-title");
 
   return {
     rank,
@@ -46,7 +47,8 @@ export function formatSpotlight($item, $, rank) {
     jname:       nameEl.attr("data-jp") || null,
     description: clean($item.find(".desi-description").text()),
     poster:      $item.find(".deslide-cover-img img").attr("data-src") || null,
-    banner:      $item.find(".slide-bg, [data-src]").first().attr("data-src") || null,
+    // banner = same cover image (hianime doesn't expose a separate banner field)
+    banner:      $item.find(".deslide-cover-img img").attr("data-src") || null,
     type:        clean($item.find(".scd-item").first().text()),
     duration:    clean($item.find(".scd-item").eq(1).text()),
     rating:      clean($item.find(".quality").text()) || null,
@@ -60,14 +62,17 @@ export function formatSpotlight($item, $, rank) {
 // ── Trending Item ──────────────────────────────────────────────────────────────
 
 export function formatTrendingItem($item, $, rank) {
-  const anchor = $item.find("a").first();
+  // Trending carousel HTML: .inner > .number (.film-title.d-title[data-jp]) + .film-poster > a[href]
+  const anchor = $item.find(".film-poster a, a.film-poster").first();
   const href   = anchor.attr("href") || "";
+  // Title is in .film-title for the carousel (not .film-name)
+  const nameEl = $item.find(".film-title, .film-name").first();
   return {
     rank,
     id:     extractId(href),
-    name:   clean($item.find(".film-name").text()),
-    jname:  $item.find(".film-name a").attr("data-jp") || null,
-    poster: $item.find("img").attr("data-src") || null,
+    name:   clean(nameEl.text()),
+    jname:  nameEl.attr("data-jp") || nameEl.find("[data-jp]").attr("data-jp") || null,
+    poster: $item.find("img").attr("data-src") || $item.find("img").attr("src") || null,
   };
 }
 
