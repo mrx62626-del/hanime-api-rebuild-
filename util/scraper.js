@@ -468,3 +468,43 @@ export async function scrapeQtip(animeId) {
     score: clean($(".score").text()) || null,
   };
 }
+
+// ─── Watch Page Helpers ───────────────────────────────────────────────────────
+
+export function extractAnilistId($) {
+  const candidates = [
+    $("#player").attr("style"),
+    $("[style*='anilistcdn']").first().attr("style"),
+    $("[style*='s4.anilist.co']").first().attr("style"),
+  ];
+  for (const style of candidates) {
+    if (!style) continue;
+    const m = style.match(/anilistcdn\/media\/anime\/banner\/(\d+)/);
+    if (m) return parseInt(m[1], 10);
+  }
+  return null;
+}
+
+export function extractSiteId($) {
+  return (
+    parseInt($("#watch-main").attr("data-id"),   10) ||
+    parseInt($("#main-wrapper").attr("data-id"), 10) ||
+    null
+  );
+}
+
+export function scrapeAnikotoEpisodeCount($) {
+  let total = null;
+  $(".bmeta .meta div").each((_, el) => {
+    const label = $(el).clone().children().remove().end().text().trim();
+    if (/^Episodes?$/i.test(label)) {
+      const n = parseInt($(el).find("span").first().text().trim(), 10);
+      if (!isNaN(n)) { total = n; return false; }
+    }
+  });
+  if (total === null) {
+    const m = $("body").text().match(/(\d+)\s*(?:Episode|Eps)/i);
+    if (m) total = parseInt(m[1], 10);
+  }
+  return total;
+}
