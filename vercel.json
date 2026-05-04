@@ -14,7 +14,16 @@
     { "source": "/api/v2/hianime/search",                        "destination": "/api/search" },
     { "source": "/api/v2/hianime/search/suggestion",             "destination": "/api/search-suggestion" },
     { "source": "/api/v2/hianime/servers",                       "destination": "/api/servers" },
-    { "source": "/api/v2/hianime/sources",                       "destination": "/api/sources" }
+    { "source": "/api/v2/hianime/sources",                       "destination": "/api/sources" },
+
+    {
+      "source": "/api/v2/hianime/:animeId/episodes",
+      "destination": "/api/watch-episodes?id=:animeId"
+    },
+    {
+      "source": "/api/v2/hianime/:animeId/ep:number",
+      "destination": "/api/watch-episode-detail?id=:animeId&ep=:number"
+    }
   ],
   "headers": [
     {
