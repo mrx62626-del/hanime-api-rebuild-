@@ -27,14 +27,18 @@ export async function getAzList(sortOption = 'all', page = 1) {
   return parseAzList(html);
 }
 
-export async function getGenre(name, page = 1) {
-  const html = await get(`${BASE}/genres/${name}`, { params: { page } });
+export async function getGenre(name, page = 1, sort = null) {
+  const params = { page };
+  if (sort) params.sort = sort;
+  const html = await get(`${BASE}/genres/${name}`, { params });
   return parseListPage(html);
 }
 
-export async function getCategory(name, page = 1) {
+export async function getCategory(name, page = 1, sort = null) {
   // categories: movie, tv, ova, ona, special, new-releases, updates, ongoing, recent, completed, upcoming
-  const html = await get(`${BASE}/${name}`, { params: { page } });
+  const params = { page };
+  if (sort) params.sort = sort;
+  const html = await get(`${BASE}/${name}`, { params });
   return parseListPage(html);
 }
 
@@ -43,8 +47,10 @@ export async function getCategory(name, page = 1) {
 // and produce the same HTML structure — parseListPage handles both identically.
 // getType is a named alias so routes can be semantically distinct.
 
-export async function getType(name, page = 1) {
-  const html = await get(`${BASE}/${name}`, { params: { page } });
+export async function getType(name, page = 1, sort = null) {
+  const params = { page };
+  if (sort) params.sort = sort;
+  const html = await get(`${BASE}/${name}`, { params });
   return parseListPage(html);
 }
 
