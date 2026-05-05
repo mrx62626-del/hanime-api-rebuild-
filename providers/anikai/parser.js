@@ -152,6 +152,21 @@ export function parseNavMenu(html, providerName = 'anikai') {
       filter_link: `${`/api/v2/${providerName}`}/search`,
     },
     menu: { genres, types, links },
+    // Sort options supported by ?sort= on search, genre, category, and type endpoints.
+    // Values match the site's ?sort= query param (confirmed from /browser dropdown).
+    sortOptions: [
+      { label: 'Updated date',   value: 'updated_date'  },
+      { label: 'Release date',   value: 'release_date'  },
+      { label: 'End date',       value: 'end_date'       },
+      { label: 'Added date',     value: 'added_date'     },
+      { label: 'Trending',       value: 'trending'       },
+      { label: 'Name A-Z',       value: 'name_az'        },
+      { label: 'Average score',  value: 'score'          },
+      { label: 'MAL score',      value: 'mal_score'      },
+      { label: 'Most viewed',    value: 'most_viewed'    },
+      { label: 'Most followed',  value: 'most_followed'  },
+      { label: 'Episode count',  value: 'episode_count'  },
+    ],
     language: ['en', 'jp'],
   };
 }
