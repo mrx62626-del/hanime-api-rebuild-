@@ -1,56 +1,55 @@
 // ─── Watch URL + Video Source Config ─────────────────────────────────────────
 //
-// watchUrl     — The primary anime streaming site to scrape watch pages from.
-//                Set this to your deployment (e.g. anikototv.to or hianime.re).
+// watchUrl     — Primary anime site whose /watch/{slug} pages are scraped.
+//                Anikoto pages expose anilist_id in the banner background-image
+//                and episode counts in .bmeta — no inline episode list (Type 1).
 //
-// hiAnimeUrl   — HiAnime base URL used exclusively to hit the
-//                /ajax/v2/episode/list/{id} AJAX endpoint for episode titles.
-//                If watchUrl == hiAnimeUrl, the page is treated as "episode-list" type.
-//                If watchUrl != hiAnimeUrl (e.g. anikoto), it's "count-only" type.
+// hiAnimeUrl   — Used to fetch the /ajax/v2/episode/list/{siteId} endpoint
+//                for episode title lists when watchUrl IS hianime.re (Type 2).
+//                When watchUrl is anikoto, this is NOT used (different ID space).
 //
-// videoSrc     — Streaming URL templates for sub/dub playback.
-//                Uses anilist_id (extracted from the watch page banner) + episode number.
+// videoSrc     — Streaming URL builders using anilist_id from the banner image.
 //
-// Usage in API responses:
-//   streaming.sub = "https://megaplay.buzz/stream/ani/169755/14/sub"
-//   streaming.dub = "https://megaplay.buzz/stream/ani/169755/14/dub"
-
-const HIANIME_URL = "https://hianime.re";
+// Streaming URL format:
+//   sub → https://megaplay.buzz/stream/ani/{anilist_id}/{episode_num}/sub
+//   dub → https://megaplay.buzz/stream/ani/{anilist_id}/{episode_num}/dub
 
 // ── Primary watch site ────────────────────────────────────────────────────────
-// Change this to switch between anikoto and hianime as the page-scrape source.
-const WATCH_URL = "https://anikototv.to";
+// Switch between "https://anikototv.to" and "https://hianime.re" here.
+const WATCH_URL   = "https://anikototv.to";
+const HIANIME_URL = "https://hianime.re";
 
 // ── Streaming base ────────────────────────────────────────────────────────────
 const MEGAPLAY_BASE = "https://megaplay.buzz/stream/ani";
 
 export const WATCH_CONFIG = {
-  // The site whose /watch/{slug} pages are scraped for episode data
+  // Site whose /watch/{slug} HTML pages are scraped for anilistId / episode data
   watchUrl: WATCH_URL,
 
-  // HiAnime — used for /ajax/v2/episode/list/{numericId} regardless of watchUrl
+  // HiAnime base — used exclusively for /ajax/v2/episode/list/{numericId}
+  // (only relevant when watchUrl === HIANIME_URL)
   hiAnimeUrl: HIANIME_URL,
 
-  // Streaming URL builders
+  // ── Streaming URL builders ────────────────────────────────────────────────
   videoSrc: {
     /**
-     * Build a sub stream URL for a specific episode.
+     * Full sub stream URL for a specific episode.
      * @param {number} anilistId  — extracted from banner bg-image
      * @param {number} episodeNum — episode number
-     * @returns {string}
+     * @returns {string}  e.g. "https://megaplay.buzz/stream/ani/169755/1/sub"
      */
     sub: (anilistId, episodeNum) =>
       `${MEGAPLAY_BASE}/${anilistId}/${episodeNum}/sub`,
 
     /**
-     * Build a dub stream URL for a specific episode.
+     * Full dub stream URL for a specific episode.
      */
     dub: (anilistId, episodeNum) =>
       `${MEGAPLAY_BASE}/${anilistId}/${episodeNum}/dub`,
 
     /**
-     * Template strings (no episode number — for episode-list responses).
-     * Replace {ep} client-side.
+     * Template strings for episode-list responses.
+     * Replace {ep} client-side with the actual episode number.
      */
     subTemplate: (anilistId) => `${MEGAPLAY_BASE}/${anilistId}/{ep}/sub`,
     dubTemplate: (anilistId) => `${MEGAPLAY_BASE}/${anilistId}/{ep}/dub`,
