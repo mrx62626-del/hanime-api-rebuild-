@@ -3,7 +3,6 @@
   "rewrites": [
     { "source": "/api/v2/hianime/home",                          "destination": "/api/home" },
     { "source": "/api/v2/hianime/anime/:id",                     "destination": "/api/anime?id=:id" },
-    { "source": "/api/v2/hianime/anime/:animeId/episodes",       "destination": "/api/episodes?id=:animeId" },
     { "source": "/api/v2/hianime/azlist/:sort",                  "destination": "/api/azlist?sort=:sort" },
     { "source": "/api/v2/hianime/category/:name",                "destination": "/api/category?name=:name" },
     { "source": "/api/v2/hianime/episodes",                      "destination": "/api/episodes" },
@@ -15,8 +14,24 @@
     { "source": "/api/v2/hianime/search/suggestion",             "destination": "/api/search-suggestion" },
     { "source": "/api/v2/hianime/servers",                       "destination": "/api/servers" },
     { "source": "/api/v2/hianime/sources",                       "destination": "/api/sources" },
-    { "source": "/api/v2/hianime/:animeId/episodes",             "destination": "/api/watch?id=:animeId" },
-    { "source": "/api/v2/hianime/:animeId/ep:number",            "destination": "/api/watch?id=:animeId&ep=:number" }
+
+    {
+      "source": "/api/v2/hianime/anime/:animeId/episodes",
+      "destination": "/api/watch-episodes?id=:animeId"
+    },
+    {
+      "source": "/api/v2/hianime/anime/:animeId/ep:number",
+      "destination": "/api/watch-episode-detail?id=:animeId&ep=:number"
+    },
+
+    {
+      "source": "/api/v2/hianime/:animeId/episodes",
+      "destination": "/api/watch-episodes?id=:animeId"
+    },
+    {
+      "source": "/api/v2/hianime/:animeId/ep:number",
+      "destination": "/api/watch-episode-detail?id=:animeId&ep=:number"
+    }
   ],
   "headers": [
     {
