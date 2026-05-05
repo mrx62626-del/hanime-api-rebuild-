@@ -241,7 +241,9 @@ export function parseHome(html) {
     $('div.swiper.alist-group .swiper-wrapper .swiper-slide').each((_, slide) => {
       const title = $(slide).find('.shead .stitle').text().trim();
       if (title.toLowerCase() === sectionTitle.toLowerCase()) {
-        result = each($, '.aitem', $(slide), (el) => {
+        result = [];
+        $(slide).find('.aitem').each((_, item) => {
+          const el = $(item);
           const href   = el.attr('href');
           const id     = href ? href.replace('/watch/', '').trim() : null;
           const name   = attr($, 'h6.title', 'title', el) || text($, 'h6.title', el);
@@ -253,7 +255,7 @@ export function parseHome(html) {
             const t = $(b).text().trim();
             if (t && isNaN(parseInt(t, 10))) type = t;
           });
-          return { id, name, jname, poster, type, episodes: eps };
+          result.push({ id, name, jname, poster, type, episodes: eps });
         });
       }
     });
