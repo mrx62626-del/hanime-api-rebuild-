@@ -5,6 +5,9 @@ const BACKUP  = "https://aniwatch.re";
 // Active domain — swap to BACKUP if primary goes down
 const BASE = PRIMARY;
 
+// Watch/episode scraping site (anikototv.to layout — has inline episode lists)
+export const WATCH_BASE = "https://anikototv.to";
+
 export const BASE_URL = BASE;
 
 export const URLS = {
@@ -16,6 +19,10 @@ export const URLS = {
   // Anime detail
   animeInfo:  (id) => `${BASE}/anime/${id}`,
   animeWatch: (id) => `${BASE}/watch/${id}`,
+
+  // Watch site (anikototv.to) — for episode scraping
+  watchSite:      (id) => `${WATCH_BASE}/watch/${id}`,
+  watchEpisodes:  (numericId) => `${WATCH_BASE}/ajax/v2/episode/list/${numericId}`,
 
   // AJAX
   relatedAnimes:   (numericId) => `${BASE}/ajax/anime/related?id=${numericId}`,
@@ -29,7 +36,7 @@ export const URLS = {
   producer:  (name, page = 1) => `${BASE}/producer/${name}?page=${page}`,
   azList:    (opt, page = 1)  => `${BASE}/az-list/${opt}?page=${page}`,
 
-  // Episodes & servers
+  // Episodes & servers (hianime)
   episodes:       (animeId)   => `${BASE}/ajax/v2/episode/list/${animeId}`,
   episodeServers: (episodeId) => `${BASE}/ajax/v2/episode/servers?episodeId=${episodeId}`,
   episodeSources: (serverId)  => `${BASE}/ajax/v2/episode/sources?id=${serverId}`,

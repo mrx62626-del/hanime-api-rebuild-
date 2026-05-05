@@ -7,6 +7,18 @@ export const CONFIG = {
   // Default pagination
   DEFAULT_PAGE: 1,
 
+  // ── Watch / streaming config ───────────────────────────────────────────────
+  WATCH: {
+    // Fallback watch site used for episode scraping (anikototv.to layout)
+    watchurl: "https://anikototv.to",
+
+    // Stream URL templates — {anilist_id} and {ep_num} are replaced at runtime
+    videosrc: {
+      sub: "https://megaplay.buzz/stream/ani/{anilist_id}/{ep_num}/sub",
+      dub: "https://megaplay.buzz/stream/ani/{anilist_id}/{ep_num}/dub",
+    },
+  },
+
   // Request headers to mimic a real browser
   REQUEST_HEADERS: {
     "User-Agent":
