@@ -46,6 +46,26 @@ app.get('/api/v2/:provider/anime/:animeId', async (c) => {
   return ok(c, data);
 });
 
+// ─── Episode list ─────────────────────────────────────────────────────────────
+// GET /api/v2/anikai/anime/:animeId/episodes
+// Returns all episodes with streaming src URLs attached.
+
+app.get('/api/v2/:provider/anime/:animeId/episodes', async (c) => {
+  const p = await getProvider(c.req.param('provider'));
+  const data = await p.anime.getEpisodes(c.req.param('animeId'));
+  return ok(c, data);
+});
+
+// ─── Single episode ───────────────────────────────────────────────────────────
+// GET /api/v2/anikai/anime/:animeId/ep/:number
+// Returns one episode by number with streaming src URLs.
+
+app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
+  const p = await getProvider(c.req.param('provider'));
+  const data = await p.anime.getEpisode(c.req.param('animeId'), c.req.param('number'));
+  return ok(c, data);
+});
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 // GET /api/v2/anikai/search?q=&page=&type=&status=&sort=&genre=...
 
@@ -107,6 +127,8 @@ app.get('/api/v2/:provider/category/:name', async (c) => {
 app.get('/api/home',           async (c) => { const p = await provider(c); return ok(c, await p.anime.getHome()); });
 app.get('/api/search',         async (c) => { const p = await provider(c); const q = c.req.query('q'); if (!q) return err(c, 'Missing q', 400); const page = parseInt(c.req.query('page') || '1', 10); return ok(c, await p.search.query(q, page)); });
 app.get('/api/anime/:id',      async (c) => { const p = await provider(c); return ok(c, await p.anime.getById(c.req.param('id'))); });
+app.get('/api/anime/:id/episodes', async (c) => { const p = await provider(c); return ok(c, await p.anime.getEpisodes(c.req.param('id'))); });
+app.get('/api/anime/:id/ep/:number', async (c) => { const p = await provider(c); return ok(c, await p.anime.getEpisode(c.req.param('id'), c.req.param('number'))); });
 app.get('/api/genre/:name',    async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); const d = await p.anime.getGenre(c.req.param('name'), pg); return ok(c, d); });
 app.get('/api/category/:name', async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); const d = await p.anime.getCategory(c.req.param('name'), pg); return ok(c, d); });
 app.get('/api/azlist/:sort',   async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); return ok(c, await p.anime.getAzList(c.req.param('sort'), pg)); });
