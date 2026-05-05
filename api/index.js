@@ -24,15 +24,15 @@ function err(c, message, status = 500) {
   return c.json({ success: false, error: message }, status);
 }
 
-function provider(c) {
-  return getProvider(c.req.query('provider'));
+async function provider(c) {
+  return await getProvider(c.req.query('provider'));
 }
 
 // ─── Home ─────────────────────────────────────────────────────────────────────
 // GET /api/v2/anikai/home
 
 app.get('/api/v2/:provider/home', async (c) => {
-  const p = getProvider(c.req.param('provider'));
+  const p = await getProvider(c.req.param('provider'));
   const data = await p.anime.getHome();
   return ok(c, data);
 });
@@ -41,7 +41,7 @@ app.get('/api/v2/:provider/home', async (c) => {
 // GET /api/v2/anikai/anime/:animeId
 
 app.get('/api/v2/:provider/anime/:animeId', async (c) => {
-  const p = getProvider(c.req.param('provider'));
+  const p = await getProvider(c.req.param('provider'));
   const data = await p.anime.getById(c.req.param('animeId'));
   return ok(c, data);
 });
@@ -52,10 +52,10 @@ app.get('/api/v2/:provider/anime/:animeId', async (c) => {
 app.get('/api/v2/:provider/search', async (c) => {
   const q = c.req.query('q');
   if (!q) return err(c, 'Missing query parameter: q', 400);
-  const p = getProvider(c.req.param('provider'));
+  const p = await getProvider(c.req.param('provider'));
   const page = parseInt(c.req.query('page') || '1', 10);
   const { q: _q, page: _p, provider: _pr, ...filters } = Object.fromEntries(
-    Object.entries(c.req.query()).filter(([k]) => !['q','page','provider'].includes(k))
+    Object.entries(c.req.query()).filter(([k]) => !['q', 'page', 'provider'].includes(k))
   );
   const data = await p.search.query(q, page, filters);
   return ok(c, data);
@@ -65,7 +65,7 @@ app.get('/api/v2/:provider/search', async (c) => {
 // GET /api/v2/anikai/azlist/:sortOption?page=
 
 app.get('/api/v2/:provider/azlist/:sortOption', async (c) => {
-  const p    = getProvider(c.req.param('provider'));
+  const p    = await getProvider(c.req.param('provider'));
   const sort = c.req.param('sortOption');
   const page = parseInt(c.req.query('page') || '1', 10);
   const data = await p.anime.getAzList(sort, page);
@@ -73,7 +73,7 @@ app.get('/api/v2/:provider/azlist/:sortOption', async (c) => {
 });
 
 app.get('/api/v2/:provider/azlist', async (c) => {
-  const p    = getProvider(c.req.param('provider'));
+  const p    = await getProvider(c.req.param('provider'));
   const page = parseInt(c.req.query('page') || '1', 10);
   const data = await p.anime.getAzList('all', page);
   return ok(c, data);
@@ -83,7 +83,7 @@ app.get('/api/v2/:provider/azlist', async (c) => {
 // GET /api/v2/anikai/genre/:name?page=
 
 app.get('/api/v2/:provider/genre/:name', async (c) => {
-  const p    = getProvider(c.req.param('provider'));
+  const p    = await getProvider(c.req.param('provider'));
   const name = c.req.param('name');
   const page = parseInt(c.req.query('page') || '1', 10);
   const data = await p.anime.getGenre(name, page);
@@ -95,7 +95,7 @@ app.get('/api/v2/:provider/genre/:name', async (c) => {
 // categories: movie, tv, ova, ona, special, new-releases, updates, ongoing, recent, completed, upcoming
 
 app.get('/api/v2/:provider/category/:name', async (c) => {
-  const p    = getProvider(c.req.param('provider'));
+  const p    = await getProvider(c.req.param('provider'));
   const name = c.req.param('name');
   const page = parseInt(c.req.query('page') || '1', 10);
   const data = await p.anime.getCategory(name, page);
@@ -104,12 +104,12 @@ app.get('/api/v2/:provider/category/:name', async (c) => {
 
 // ─── Shorthand routes (no provider prefix → uses default) ────────────────────
 
-app.get('/api/home',               async (c) => { const p = provider(c); return ok(c, await p.anime.getHome()); });
-app.get('/api/search',             async (c) => { const p = provider(c); const q = c.req.query('q'); if (!q) return err(c,'Missing q',400); const page = parseInt(c.req.query('page')||'1',10); return ok(c, await p.search.query(q, page)); });
-app.get('/api/anime/:id',          async (c) => { const p = provider(c); return ok(c, await p.anime.getById(c.req.param('id'))); });
-app.get('/api/genre/:name',        async (c) => { const p = provider(c); const pg = parseInt(c.req.query('page')||'1',10); const d = await p.anime.getGenre(c.req.param('name'),pg); return ok(c,d); });
-app.get('/api/category/:name',     async (c) => { const p = provider(c); const pg = parseInt(c.req.query('page')||'1',10); const d = await p.anime.getCategory(c.req.param('name'),pg); return ok(c,d); });
-app.get('/api/azlist/:sort',       async (c) => { const p = provider(c); const pg = parseInt(c.req.query('page')||'1',10); return ok(c, await p.anime.getAzList(c.req.param('sort'),pg)); });
+app.get('/api/home',           async (c) => { const p = await provider(c); return ok(c, await p.anime.getHome()); });
+app.get('/api/search',         async (c) => { const p = await provider(c); const q = c.req.query('q'); if (!q) return err(c, 'Missing q', 400); const page = parseInt(c.req.query('page') || '1', 10); return ok(c, await p.search.query(q, page)); });
+app.get('/api/anime/:id',      async (c) => { const p = await provider(c); return ok(c, await p.anime.getById(c.req.param('id'))); });
+app.get('/api/genre/:name',    async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); const d = await p.anime.getGenre(c.req.param('name'), pg); return ok(c, d); });
+app.get('/api/category/:name', async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); const d = await p.anime.getCategory(c.req.param('name'), pg); return ok(c, d); });
+app.get('/api/azlist/:sort',   async (c) => { const p = await provider(c); const pg = parseInt(c.req.query('page') || '1', 10); return ok(c, await p.anime.getAzList(c.req.param('sort'), pg)); });
 
 // ─── Error handler ────────────────────────────────────────────────────────────
 
@@ -119,6 +119,5 @@ app.onError((error, c) => {
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
-// handle() wraps Hono for Vercel's serverless Node.js runtime
 
 export default handle(app);
