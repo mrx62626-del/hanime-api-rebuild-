@@ -61,33 +61,77 @@ function parseGenreList($) {
 // ─── Nav menu (full header structure) ────────────────────────────────────────
 // Extracts genres, types, and quick-links from the nav menu present on every page.
 // Selector map (confirmed from live HTML):
-//   Genres  → #menu ul li ul.c4 li a
-//   Types   → #menu ul li ul.c1 li a
-//   Links   → #menu > ul > li > a[href] (direct anchors, not inside a sub-ul)
+//   Genres  → #menu ul li ul.c4 li a   (href: /genres/action)
+//   Types   → #menu ul li ul.c1 li a   (href: /ova, /tv, /movie ...)
+//   Links   → #menu > ul > li > a[href] (href: /new-releases, /updates ...)
+//
+// providerName is passed in so every url is rewritten to the API path:
+//   /genres/action  →  /api/v2/{provider}/genre/action
+//   /ova            →  /api/v2/{provider}/type/ova
+//   /new-releases   →  /api/v2/{provider}/category/new-releases
 
-export function parseNavMenu(html) {
+// Known type slugs used by the site as top-level paths (ul.c1)
+const TYPE_SLUGS = new Set(['movie', 'tv', 'ova', 'ona', 'special', 'music']);
+
+// Known category slugs that map to /category/:name
+const CATEGORY_SLUGS = new Set([
+  'new-releases', 'updates', 'ongoing', 'recent',
+  'completed', 'upcoming', 'most-popular', 'most-favorite',
+  'subbed-anime', 'dubbed-anime', 'recently-updated', 'recently-added',
+  'top-upcoming', 'top-airing',
+]);
+
+function toApiUrl(siteHref, providerName) {
+  if (!siteHref || siteHref === 'javascript:;') return null;
+
+  const base = `/api/v2/${providerName}`;
+
+  // /genres/action  →  /api/v2/{p}/genre/action
+  const genreMatch = siteHref.match(/^\/genres\/(.+)$/);
+  if (genreMatch) return `${base}/genre/${genreMatch[1]}`;
+
+  // /az-list or /az-list/A  →  /api/v2/{p}/azlist or /api/v2/{p}/azlist/A
+  const azMatch = siteHref.match(/^\/az-list\/?(.*)$/);
+  if (azMatch !== null) {
+    return azMatch[1] ? `${base}/azlist/${azMatch[1]}` : `${base}/azlist`;
+  }
+
+  // /watch/some-id  →  /api/v2/{p}/anime/some-id
+  const watchMatch = siteHref.match(/^\/watch\/(.+)$/);
+  if (watchMatch) return `${base}/anime/${watchMatch[1]}`;
+
+  // strip leading slash to get the slug
+  const slug = siteHref.replace(/^\//, '');
+
+  if (TYPE_SLUGS.has(slug))     return `${base}/type/${slug}`;
+  if (CATEGORY_SLUGS.has(slug)) return `${base}/category/${slug}`;
+
+  // fallback: keep as-is (e.g. /random, /watch2gether)
+  return siteHref;
+}
+
+export function parseNavMenu(html, providerName = 'anikai') {
   const $ = load(html);
 
   const genres = each($, '#menu ul li ul.c4 li a', (el) => ({
     name: el.text().trim(),
-    url:  el.attr('href') || null,
+    url:  toApiUrl(el.attr('href'), providerName),
   })).filter(g => g.name);
 
   const types = each($, '#menu ul li ul.c1 li a', (el) => ({
     name: el.text().trim(),
-    url:  el.attr('href') || null,
+    url:  toApiUrl(el.attr('href'), providerName),
   })).filter(t => t.name);
 
   // Direct top-level <li><a href="..."> links (not javascript:; parents of sub-menus)
   const links = [];
   $('#menu > ul > li > a').each((_, a) => {
     const href = $(a).attr('href');
-    const name = $(a).text().replace(/<[^>]+>/g, '').trim();
+    const name = $(a).clone().find('i').remove().end().text().trim();
     if (href && href !== 'javascript:;' && name) {
-      // Skip mobile-only duplicates (Random / Watch2gether exist as nav buttons too)
       const parentLi = $(a).parent('li');
       const isMobileOnly = parentLi.hasClass('d-block') && parentLi.hasClass('d-md-none');
-      if (!isMobileOnly) links.push({ name, url: href });
+      if (!isMobileOnly) links.push({ name, url: toApiUrl(href, providerName) });
     }
   });
 
@@ -103,9 +147,9 @@ export function parseNavMenu(html) {
     brand,
     buttons: { menu: true, search: true, watch2gether: w2g, random },
     search: {
-      action:      $('header form[action]').attr('action') || '/browser',
+      action:      `${`/api/v2/${providerName}`}/search`,
       placeholder: $('header form input[name="keyword"]').attr('placeholder') || 'Search anime',
-      filter_link: $('header form a[href]').attr('href') || '/browser',
+      filter_link: `${`/api/v2/${providerName}`}/search`,
     },
     menu: { genres, types, links },
     language: ['en', 'jp'],
