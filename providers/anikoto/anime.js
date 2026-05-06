@@ -1,47 +1,60 @@
 // providers/anikoto/anime.js
 import { get } from '../../utils/http.js';
 import {
-  parseAnime,
   parseHome,
-  parseAzList,
+  parseAnime,
   parseListPage,
   parseNavMenu,
   parseIndex,
+  parseEpisodesFromJson,
+  parseAnimeFromJson,
+  parseAzListFromHtml,
 } from './parser.js';
 import { BASE_URLS } from '../../constants/baseurl.js';
 
-const BASE = BASE_URLS.anikoto;
+const BASE = BASE_URLS.anikoto;           // https://anikototv.to
+const API_BASE = BASE_URLS.anikotoApi;    // https://anikotoapi.site
 
+// ─── Home Page ─────────────────────────────────────────────────────────
 export async function getHome() {
   const html = await get(`${BASE}/home`);
   return parseHome(html);
 }
 
+// ─── Index / Landing Page ───────────────────────────────────────────────
 export async function getIndex() {
   const html = await get(`${BASE}/`);
   return parseIndex(html);
 }
 
+// ─── Anime Detail ──────────────────────────────────────────────────────
 export async function getById(id) {
-  // Primary: fetch from main site watch page
-  // Fallback: fetch JSON from anikotoapi.site
   try {
-    const html = await get(`${BASE}/watch/${id}`);
-    return parseAnime(html);
-  } catch (e) {
-    // Try JSON API endpoint
-    const jsonUrl = `https://anikotoapi.site/series/${id}`;
+    // Try JSON API first (most reliable for anikoto)
+    const jsonUrl = `${API_BASE}/series/${id}`;
     const data = await get(jsonUrl);
     return parseAnimeFromJson(data);
+  } catch (e) {
+    // Fallback to HTML scraping from watch page
+    try {
+      const html = await get(`${BASE}/watch/${id}`);
+      return parseAnime(html);
+    } catch (err) {
+      throw new Error(`Failed to fetch anime details for "${id}": ${err.message}`);
+    }
   }
 }
 
+// ─── A-Z List ───────────────────────────────────────────────────────────
 export async function getAzList(sortOption = 'all', page = 1) {
   const path = sortOption === 'all' ? '/az-list' : `/az-list/${sortOption}`;
-  const html = await get(`${BASE}${path}`, { params: { page } });
-  return parseAzList(html);
+  const params = {};
+  if (page > 1) params.page = page;
+  const html = await get(`${BASE}${path}`, { params });
+  return parseAzListFromHtml(html);
 }
 
+// ─── Genre ──────────────────────────────────────────────────────────────
 export async function getGenre(name, page = 1, sort = null) {
   const params = { page };
   if (sort) params.sort = sort;
@@ -49,176 +62,56 @@ export async function getGenre(name, page = 1, sort = null) {
   return parseListPage(html);
 }
 
+// ─── Category ───────────────────────────────────────────────────────────
 export async function getCategory(name, page = 1, sort = null) {
   const params = { page };
   if (sort) params.sort = sort;
-  const html = await get(`${BASE}/${name}`, { params });
+  // Categories with status prefix need full path
+  const path = name.startsWith('status/') ? `/${name}` : `/${name}`;
+  const html = await get(`${BASE}${path}`, { params });
   return parseListPage(html);
 }
 
+// ─── Type ───────────────────────────────────────────────────────────────
 export async function getType(name, page = 1, sort = null) {
   const params = { page };
   if (sort) params.sort = sort;
-  const html = await get(`${BASE}/${name}`, { params });
+  const html = await get(`${BASE}/type/${name.toLowerCase()}`, { params });
   return parseListPage(html);
 }
 
+// ─── Nav Menu ───────────────────────────────────────────────────────────
 export async function getNavMenu(providerName = 'anikoto') {
   const html = await get(`${BASE}/home`);
   return parseNavMenu(html, providerName);
 }
 
+// ─── Episodes ──────────────────────────────────────────────────────────
 export async function getEpisodes(id) {
-  // Try JSON API first for reliable episode data
   try {
-    const jsonUrl = `https://anikotoapi.site/series/${id}`;
+    const jsonUrl = `${API_BASE}/series/${id}`;
     const data = await get(jsonUrl);
     return parseEpisodesFromJson(data);
-  } catch {
-    // Fallback to HTML parsing
-    const html = await get(`${BASE}/watch/${id}`);
-    return parseEpisodesFromHtml(html, id);
-  }
-}
-
-export async function getEpisode(id, epNum) {
-  try {
-    const jsonUrl = `https://anikotoapi.site/series/${id}`;
-    const data = await get(jsonUrl);
-    const episodes = parseEpisodesFromJson(data);
-    
-    const n = parseInt(epNum, 10);
-    const ep = episodes.episodes.find((e) => e.number === n);
-
-    if (!ep) {
-      throw new Error(`Episode ${n} not found for "${id}". Total episodes: ${episodes.totalEpisodes}.`);
-    }
-
-    return { malId: episodes.malId, alId: episodes.alId, episode: ep };
   } catch (e) {
-    // Fallback to HTML
-    const html = await get(`${BASE}/watch/${id}`);
-    const episodes = parseEpisodesFromHtml(html, id);
-    
-    const n = parseInt(epNum, 10);
-    const ep = episodes.episodes.find((e) => e.number === n);
-
-    if (!ep) {
-      throw new Error(`Episode ${n} not found for "${id}". Total episodes: ${episodes.totalEpisodes}.`);
-    }
-
-    return { malId: episodes.malId, alId: episodes.alId, episode: ep };
+    throw new Error(`Failed to fetch episodes for "${id}": ${e.message}`);
   }
 }
 
-// Internal helpers for JSON-based parsing
-function parseAnimeFromJson(data) {
-  if (!data.ok) throw new Error('Invalid JSON response');
-  
-  const d = data.data.anime;
-  return {
-    anime: {
-      id: String(d.id),
-      animeId: String(d.id),
-      name: d.title,
-      jname: d.native || null,
-      synonyms: d.alternative || null,
-      japanese: d.native || null,
-      poster: d.poster,
-      description: d.description,
-      type: d.terms_by_type?.type?.[0] || null,
-      rating: d.rating || null,
-      episodes: {
-        sub: d.is_sub || 0,
-        dub: d.is_dub || 0,
-      },
-      duration: d.duration,
-      premiered: null,
-      aired: d.aired,
-      broadcast: null,
-      status: d.status,
-      score: null,
-      episodesTotal: parseInt(d.episodes, 10) || 0,
-      country: null,
-      genres: d.terms_by_type?.genre || [],
-      studios: d.terms_by_type?.studios || [],
-      producers: d.terms_by_type?.producers || [],
-      malId: d.mal_id || null,
-      alId: d.ani_id || null,
-    },
-    related: [],
-    recommended: [],
-    seasons: [],
-  };
-}
+// ─── Single Episode ────────────────────────────────────────────────────
+export async function getEpisode(id, epNum) {
+  const episodesData = await getEpisodes(id);
+  const n = parseInt(epNum, 10);
+  const ep = episodesData.episodes.find((e) => e.number === n);
 
-function parseEpisodesFromJson(data) {
-  if (!data.ok) throw new Error('Invalid JSON response');
-  
-  const d = data.data;
-  const anime = d.anime;
-  const episodesList = d.episodes || [];
-  
-  const total = episodesList.length;
-  const malId = anime.mal_id || null;
-  const alId = anime.ani_id || null;
-  const name = anime.title;
-  
-  const episodes = episodesList.map(ep => ({
-    number: ep.number,
-    title: ep.title,
-    isFiller: false,
-    hasSub: !!ep.embed_url?.sub,
-    hasDub: !!ep.embed_url?.dub,
-    sources: {
-      ...(ep.embed_url?.sub ? { sub: ep.embed_url.sub } : {}),
-      ...(ep.embed_url?.dub ? { dub: ep.embed_url.dub } : {}),
-    },
-  }));
-  
-  return {
-    totalEpisodes: total,
-    malId,
-    alId,
-    episodes,
-  };
-}
+  if (!ep) {
+    throw new Error(
+      `Episode ${n} not found for "${id}". Total episodes: ${episodesData.totalEpisodes}.`
+    );
+  }
 
-export function parseEpisodesFromHtml(html, id) {
-  const { load } = require('../../utils/dom.js');
-  const $ = load(html);
-  
-  const total = $('.episode-section .ep-item').length || 
-                parseInt($('.info .total').text().trim(), 10) || 0;
-  
-  const malId = $('#watch-page').attr('data-mal-id') || null;
-  const alId = $('#watch-page').attr('data-al-id') || null;
-  
-  const episodes = [];
-  $('.episode-section .ep-item').each((i, el) => {
-    const $el = $(el);
-    const number = parseInt($el.find('.ep-num').text().trim(), 10) || (i + 1);
-    const title = $el.find('.ep-title').text().trim() || `${id} - Episode ${number}`;
-    const subUrl = $el.attr('data-sub') || $el.find('a.sub').attr('href') || null;
-    const dubUrl = $el.attr('data-dub') || $el.find('a.dub').attr('href') || null;
-    
-    episodes.push({
-      number,
-      title,
-      isFiller: false,
-      hasSub: !!subUrl,
-      hasDub: !!dubUrl,
-      sources: {
-        ...(subUrl ? { sub: subUrl } : {}),
-        ...(dubUrl ? { dub: dubUrl } : {}),
-      },
-    });
-  });
-  
   return {
-    totalEpisodes: total,
-    malId,
-    alId,
-    episodes,
+    malId: episodesData.malId,
+    alId: episodesData.alId,
+    episode: ep,
   };
 }
