@@ -9,6 +9,7 @@ import {
   parseEpisodesFromJson,
   parseAnimeFromJson,
   parseAzListFromHtml,
+  mergeAnimeData,
 } from './parser.js';
 import { BASE_URLS } from '../../constants/baseurl.js';
 
@@ -27,28 +28,55 @@ export async function getIndex() {
   return parseIndex(html);
 }
 
-// ─── Anime Detail (Smart routing: numeric → API, slug → scraper) ────
+// ─── Anime Detail (Combined: JSON API + HTML scraper) ───────────────
 export async function getById(id) {
   const isNumeric = /^\d+$/.test(id);
-  
-  if (isNumeric) {
-    // Numeric ID: use external JSON API (most reliable)
+  let jsonData = null;
+  let htmlData = null;
+  let numericId = isNumeric ? id : null;
+
+  // ── Step 1: Try JSON API ──────────────────────────────────────────
+  if (numericId) {
     try {
-      const jsonUrl = `${API_BASE}/series/${id}`;
-      const data = await get(jsonUrl);
-      return parseAnimeFromJson(data);
+      const jsonUrl = `${API_BASE}/series/${numericId}`;
+      const raw = await get(jsonUrl);
+      jsonData = parseAnimeFromJson(raw);
     } catch (e) {
-      throw new Error(`Failed to fetch anime "${id}" from API: ${e.message}`);
+      // JSON API failed, will rely on HTML
     }
   }
-  
-  // Slug: scrape the watch page HTML
+
+  // ── Step 2: Try HTML scraper ──────────────────────────────────────
   try {
-    const html = await get(`${BASE}/watch/${id}`);
-    return parseAnime(html);
+    const fetchId = numericId || id;
+    const html = await get(`${BASE}/watch/${fetchId}`);
+    htmlData = parseAnime(html);
+
+    // If we didn't have a numeric ID before, extract it from HTML
+    if (!numericId && htmlData.anime.animeId) {
+      numericId = htmlData.anime.animeId;
+    }
   } catch (e) {
-    throw new Error(`Failed to fetch anime "${id}" from watch page: ${e.message}`);
+    // HTML scraper failed
   }
+
+  // ── Step 3: If HTML gave us a numeric ID but JSON wasn't tried ────
+  if (!jsonData && numericId && !isNumeric) {
+    try {
+      const jsonUrl = `${API_BASE}/series/${numericId}`;
+      const raw = await get(jsonUrl);
+      jsonData = parseAnimeFromJson(raw);
+    } catch (e) {
+      // Both failed
+    }
+  }
+
+  // ── Step 4: Merge results ─────────────────────────────────────────
+  if (jsonData || htmlData) {
+    return mergeAnimeData(jsonData, htmlData);
+  }
+
+  throw new Error(`Failed to fetch anime "${id}" from all sources`);
 }
 
 // ─── A-Z List ────────────────────────────────────────────────────────
@@ -90,36 +118,34 @@ export async function getNavMenu(providerName = 'anikoto') {
   return parseNavMenu(html, providerName);
 }
 
-// ─── Episodes ────────────────────────────────────────────────────────
+// ─── Episodes (always from JSON API) ─────────────────────────────────
 export async function getEpisodes(id) {
   const isNumeric = /^\d+$/.test(id);
-  
-  if (isNumeric) {
+  let numericId = isNumeric ? id : null;
+
+  // If slug, try to get numeric ID from HTML first
+  if (!numericId) {
     try {
-      const jsonUrl = `${API_BASE}/series/${id}`;
+      const html = await get(`${BASE}/watch/${id}`);
+      const parsed = parseAnime(html);
+      numericId = parsed.anime.animeId;
+    } catch (e) {
+      // Will try slug directly
+    }
+  }
+
+  // Try JSON API with numeric ID
+  if (numericId) {
+    try {
+      const jsonUrl = `${API_BASE}/series/${numericId}`;
       const data = await get(jsonUrl);
       return parseEpisodesFromJson(data);
     } catch (e) {
       throw new Error(`Failed to fetch episodes for "${id}": ${e.message}`);
     }
   }
-  
-  // For slugs: scrape the watch page, then try API with numeric ID from page
-  try {
-    const html = await get(`${BASE}/watch/${id}`);
-    const parsed = parseAnime(html);
-    const numericId = parsed.anime.animeId;
-    
-    if (numericId && /^\d+$/.test(numericId)) {
-      const jsonUrl = `${API_BASE}/series/${numericId}`;
-      const data = await get(jsonUrl);
-      return parseEpisodesFromJson(data);
-    }
-    
-    throw new Error('Could not determine numeric ID for episodes');
-  } catch (e) {
-    throw new Error(`Failed to fetch episodes for "${id}": ${e.message}`);
-  }
+
+  throw new Error(`Could not determine numeric ID for episodes of "${id}"`);
 }
 
 // ─── Single Episode ──────────────────────────────────────────────────
