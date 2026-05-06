@@ -1,4 +1,3 @@
-// core/providerManager.js
 import * as anikai from '../providers/anikai/index.js';
 import * as anikoto from '../providers/anikoto/index.js';
 import { config } from './config.js';
@@ -14,9 +13,7 @@ const lazyProviders = {
 
 export async function getProvider(name) {
   const key = name || config.defaultProvider;
-
   if (providers[key]) return providers[key];
-
   if (lazyProviders[key]) {
     try {
       const mod = await lazyProviders[key]();
@@ -26,7 +23,6 @@ export async function getProvider(name) {
       throw new Error(`Provider "${key}" is not yet implemented.`);
     }
   }
-
   throw new Error(`Provider "${key}" not found. Available: ${Object.keys(providers).join(', ')}`);
 }
 
