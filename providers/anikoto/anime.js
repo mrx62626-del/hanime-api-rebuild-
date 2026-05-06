@@ -1,168 +1,76 @@
 // providers/anikoto/anime.js
 import { get } from '../../utils/http.js';
 import {
-  parseHome,
-  parseAnime,
-  parseListPage,
-  parseNavMenu,
-  parseIndex,
-  parseEpisodesFromJson,
-  parseAnimeFromJson,
-  parseAzListFromHtml,
-  mergeAnimeData,
+  parseHome, parseAnime, parseListPage, parseNavMenu, parseIndex,
+  parseEpisodesFromJson, parseAnimeFromJson, parseAzListFromHtml, mergeAnimeData,
 } from './parser.js';
 import { BASE_URLS } from '../../constants/baseurl.js';
 
-const BASE = BASE_URLS.anikoto;           // https://anikototv.to
-const API_BASE = BASE_URLS.anikotoApi;    // https://anikotoapi.site
+const BASE = BASE_URLS.anikoto;
+const API_BASE = BASE_URLS.anikotoApi;
 
-// ─── Home Page ───────────────────────────────────────────────────────
-export async function getHome() {
-  const html = await get(`${BASE}/home`);
-  return parseHome(html);
-}
+export async function getHome() { return parseHome(await get(`${BASE}/home`)); }
+export async function getIndex() { return parseIndex(await get(`${BASE}/`)); }
 
-// ─── Index / Landing Page ────────────────────────────────────────────
-export async function getIndex() {
-  const html = await get(`${BASE}/`);
-  return parseIndex(html);
-}
-
-// ─── Anime Detail (Combined: JSON API + HTML scraper) ───────────────
 export async function getById(id) {
   const isNumeric = /^\d+$/.test(id);
-  let jsonData = null;
-  let htmlData = null;
-  let numericId = isNumeric ? id : null;
+  let jsonData = null, htmlData = null, numericId = isNumeric ? id : null;
 
-  // ── Step 1: Try JSON API ──────────────────────────────────────────
+  // Try JSON API
   if (numericId) {
-    try {
-      const jsonUrl = `${API_BASE}/series/${numericId}`;
-      const raw = await get(jsonUrl);
-      jsonData = parseAnimeFromJson(raw);
-    } catch (e) {
-      // JSON API failed, will rely on HTML
-    }
+    try { jsonData = parseAnimeFromJson(await get(`${API_BASE}/series/${numericId}`)); } catch {}
   }
 
-  // ── Step 2: Try HTML scraper ──────────────────────────────────────
+  // Try HTML scraper
   try {
-    const fetchId = numericId || id;
-    const html = await get(`${BASE}/watch/${fetchId}`);
-    htmlData = parseAnime(html);
+    htmlData = parseAnime(await get(`${BASE}/watch/${numericId || id}`));
+    if (!numericId && htmlData.anime.animeId) numericId = htmlData.anime.animeId;
+  } catch {}
 
-    // If we didn't have a numeric ID before, extract it from HTML
-    if (!numericId && htmlData.anime.animeId) {
-      numericId = htmlData.anime.animeId;
-    }
-  } catch (e) {
-    // HTML scraper failed
-  }
-
-  // ── Step 3: If HTML gave us a numeric ID but JSON wasn't tried ────
+  // If HTML gave us a numeric ID but JSON wasn't tried yet
   if (!jsonData && numericId && !isNumeric) {
-    try {
-      const jsonUrl = `${API_BASE}/series/${numericId}`;
-      const raw = await get(jsonUrl);
-      jsonData = parseAnimeFromJson(raw);
-    } catch (e) {
-      // Both failed
-    }
+    try { jsonData = parseAnimeFromJson(await get(`${API_BASE}/series/${numericId}`)); } catch {}
   }
 
-  // ── Step 4: Merge results ─────────────────────────────────────────
-  if (jsonData || htmlData) {
-    return mergeAnimeData(jsonData, htmlData);
-  }
-
+  if (jsonData || htmlData) return mergeAnimeData(jsonData, htmlData);
   throw new Error(`Failed to fetch anime "${id}" from all sources`);
 }
 
-// ─── A-Z List ────────────────────────────────────────────────────────
-export async function getAzList(sortOption = 'all', page = 1) {
-  const path = sortOption === 'all' ? '/az-list' : `/az-list/${sortOption}`;
-  const params = {};
-  if (page > 1) params.page = page;
-  const html = await get(`${BASE}${path}`, { params });
-  return parseAzListFromHtml(html);
+export async function getAzList(sort = 'all', page = 1) {
+  const path = sort === 'all' ? '/az-list' : `/az-list/${sort}`;
+  return parseAzListFromHtml(await get(`${BASE}${path}`, { params: page > 1 ? { page } : {} }));
 }
 
-// ─── Genre ───────────────────────────────────────────────────────────
 export async function getGenre(name, page = 1, sort = null) {
-  const params = { page };
-  if (sort) params.sort = sort;
-  const html = await get(`${BASE}/genre/${name}`, { params });
-  return parseListPage(html);
+  return parseListPage(await get(`${BASE}/genre/${name}`, { params: { page, ...(sort && { sort }) } }));
 }
 
-// ─── Category ────────────────────────────────────────────────────────
 export async function getCategory(name, page = 1, sort = null) {
-  const params = { page };
-  if (sort) params.sort = sort;
-  const html = await get(`${BASE}/${name}`, { params });
-  return parseListPage(html);
+  return parseListPage(await get(`${BASE}/${name}`, { params: { page, ...(sort && { sort }) } }));
 }
 
-// ─── Type ────────────────────────────────────────────────────────────
 export async function getType(name, page = 1, sort = null) {
-  const params = { page };
-  if (sort) params.sort = sort;
-  const html = await get(`${BASE}/type/${name.toLowerCase()}`, { params });
-  return parseListPage(html);
+  return parseListPage(await get(`${BASE}/type/${name.toLowerCase()}`, { params: { page, ...(sort && { sort }) } }));
 }
 
-// ─── Nav Menu ────────────────────────────────────────────────────────
 export async function getNavMenu(providerName = 'anikoto') {
-  const html = await get(`${BASE}/home`);
-  return parseNavMenu(html, providerName);
+  return parseNavMenu(await get(`${BASE}/home`), providerName);
 }
 
-// ─── Episodes (always from JSON API) ─────────────────────────────────
 export async function getEpisodes(id) {
-  const isNumeric = /^\d+$/.test(id);
-  let numericId = isNumeric ? id : null;
-
-  // If slug, try to get numeric ID from HTML first
+  let numericId = /^\d+$/.test(id) ? id : null;
   if (!numericId) {
-    try {
-      const html = await get(`${BASE}/watch/${id}`);
-      const parsed = parseAnime(html);
-      numericId = parsed.anime.animeId;
-    } catch (e) {
-      // Will try slug directly
-    }
+    try { numericId = parseAnime(await get(`${BASE}/watch/${id}`)).anime.animeId; } catch {}
   }
-
-  // Try JSON API with numeric ID
   if (numericId) {
-    try {
-      const jsonUrl = `${API_BASE}/series/${numericId}`;
-      const data = await get(jsonUrl);
-      return parseEpisodesFromJson(data);
-    } catch (e) {
-      throw new Error(`Failed to fetch episodes for "${id}": ${e.message}`);
-    }
+    return parseEpisodesFromJson(await get(`${API_BASE}/series/${numericId}`));
   }
-
-  throw new Error(`Could not determine numeric ID for episodes of "${id}"`);
+  throw new Error(`Could not determine numeric ID for "${id}"`);
 }
 
-// ─── Single Episode ──────────────────────────────────────────────────
 export async function getEpisode(id, epNum) {
-  const episodesData = await getEpisodes(id);
-  const n = parseInt(epNum, 10);
-  const ep = episodesData.episodes.find((e) => e.number === n);
-
-  if (!ep) {
-    throw new Error(
-      `Episode ${n} not found for "${id}". Total episodes: ${episodesData.totalEpisodes}.`
-    );
-  }
-
-  return {
-    malId: episodesData.malId,
-    alId: episodesData.alId,
-    episode: ep,
-  };
+  const { totalEpisodes, malId, alId, episodes } = await getEpisodes(id);
+  const ep = episodes.find(e => e.number === parseInt(epNum, 10));
+  if (!ep) throw new Error(`Episode ${epNum} not found. Total: ${totalEpisodes}.`);
+  return { malId, alId, episode: ep };
 }
