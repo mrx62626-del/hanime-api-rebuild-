@@ -3,7 +3,7 @@ import { load, text, attr, each, num } from '../../utils/dom.js';
 
 // ─── Pagination helpers ──────────────────────────────────────────────
 function getLastPage($) {
-  const lastHref = $('nav .pagination li:last-child a.page-link, nav .pagination .page-item:last-child a.page-link').attr('href');
+  const lastHref = $('nav .pagination li:last-child a.page-link').attr('href');
   if (lastHref) {
     const m = lastHref.match(/page=(\d+)/);
     if (m) return parseInt(m[1], 10);
@@ -36,8 +36,8 @@ function extractTipId($, el) {
 }
 
 function parseGenreList($) {
-  return each($, '#menu ul li ul.c4 li a', el => 
-    el.attr('title') || el.find('h3').text().trim()
+  return each($, '#menu ul li ul.c4 li a', el =>
+    (el.attr('title') || el.find('h3').text() || '').trim()
   ).filter(Boolean);
 }
 
@@ -56,14 +56,15 @@ function parseAitem($, el) {
   const id = extractId(href);
   const tipId = extractTipId($, el);
   const nameEl = $(el).find('.name.d-title');
-  const name = nameEl.attr('data-jp') || nameEl.text().trim() || '';
-  const jname = nameEl.attr('data-jp') || null;
-  const poster = $(el).find('img').attr('src');
-  const eps = parseEpisodes($, el);
-  let type = null;
-  const typeEl = $(el).find('.meta .right').first();
-  if (typeEl.length) type = typeEl.text().trim() || null;
-  return { id, tipId, name, jname, poster, type, episodes: eps };
+  return {
+    id,
+    tipId,
+    name: nameEl.attr('data-jp') || nameEl.text().trim() || '',
+    jname: nameEl.attr('data-jp') || null,
+    poster: $(el).find('img').attr('src'),
+    type: $(el).find('.meta .right').first().text().trim() || null,
+    episodes: parseEpisodes($, el),
+  };
 }
 
 const TYPE_SLUGS = new Set(['movie', 'tv', 'ova', 'ona', 'special', 'music']);
@@ -81,35 +82,43 @@ function toApiUrl(siteHref, providerName) {
   if (slug.startsWith('type/')) return `${base}/type/${slug.replace('type/', '')}`;
   if (TYPE_SLUGS.has(slug)) return `${base}/type/${slug}`;
   if (slug === 'filter') return `${base}/search`;
+  if (slug === 'random') return `/api/v2/${providerName}/random`;
   if (slug === 'home') return `${base}/home`;
+  if (slug === 'latest-updated') return `${base}/category/latest-updated`;
+  if (slug === 'new-release') return `${base}/category/new-release`;
+  if (slug === 'most-viewed') return `${base}/category/most-viewed`;
+  if (slug.startsWith('status/')) return `${base}/category/${slug}`;
   return siteHref;
 }
 
-// ─── Detail extraction helpers ──────────────────────────────────────
+// ─── Detail extraction helpers ───────────────────────────────────────
 function detailValue($, baseSelector, label) {
   let result = null;
-  $(baseSelector).find('> div').each((_, div) => {
-    const raw = $(div).text().trim();
-    if (raw.startsWith(label)) {
-      const firstSpan = $(div).find('> span').first();
-      if (firstSpan.length && firstSpan.text().trim()) {
-        result = firstSpan.text().trim();
+  $(baseSelector).find('div').each((_, div) => {
+    if ($(div).text().trim().startsWith(label)) {
+      const span = $(div).find('> span').first();
+      if (span.length) {
+        // Get only direct text, not nested links
+        const clone = span.clone();
+        clone.find('a').remove();
+        result = clone.text().trim() || span.find('a').first().text().trim() || null;
       } else {
-        result = raw.replace(label, '').trim();
+        result = $(div).text().replace(label, '').trim() || null;
       }
       return false;
     }
   });
-  return result || null;
+  return result;
 }
 
 function detailLinks($, baseSelector, label) {
   const result = [];
-  $(baseSelector).find('> div').each((_, div) => {
+  $(baseSelector).find('div').each((_, div) => {
     if ($(div).text().trim().startsWith(label)) {
       $(div).find('a').each((_, a) => {
-        const val = ($(a).find('span').text() || $(a).text()).trim();
-        if (val && val !== 'unknown' && !result.includes(val)) result.push(val);
+        const spanText = $(a).find('span').text().trim();
+        const linkText = $(a).text().trim();
+        result.push(spanText || linkText);
       });
       return false;
     }
@@ -117,15 +126,15 @@ function detailLinks($, baseSelector, label) {
   return result;
 }
 
-// ─── Exported parsers ──────────────────────────────────────────────
+// ─── Core parsers ────────────────────────────────────────────────────
 
 export function parseNavMenu(html, providerName = 'anikoto') {
   const $ = load(html);
-  const genres = each($, '#menu ul li ul.c4 li a', el => ({
+  const genres = each($, '#menu ul li ul.c4 li a', (el) => ({
     name: (el.attr('title') || el.find('h3').text() || '').trim(),
     url: toApiUrl(el.attr('href'), providerName),
   })).filter(g => g.name);
-  const types = each($, '#menu ul li ul.c1 li a', el => ({
+  const types = each($, '#menu ul li ul.c1 li a', (el) => ({
     name: (el.attr('title') || el.find('h3').text() || '').trim(),
     url: toApiUrl(el.attr('href'), providerName),
   })).filter(t => t.name);
@@ -138,28 +147,17 @@ export function parseNavMenu(html, providerName = 'anikoto') {
     }
   });
   return {
-    brand: {
-      link: $('header .logo a').attr('href') || '/home',
-      logo: $('header .logo img').attr('src') || null,
-    },
+    brand: { link: $('header .logo a').attr('href') || '/home', logo: $('header .logo img').attr('src') || null },
     buttons: { menu: true, search: true, watch2gether: null, random: '/random' },
-    search: {
-      action: `/api/v2/${providerName}/search`,
-      placeholder: $('header input[name="keyword"]').attr('placeholder') || 'Search anime...',
-      filter_link: `/api/v2/${providerName}/search`,
-    },
+    search: { action: `/api/v2/${providerName}/search`, placeholder: $('header input[name="keyword"]').attr('placeholder') || 'Search anime...', filter_link: `/api/v2/${providerName}/search` },
     menu: { genres, types, links },
     browse: {
       url: `/api/v2/${providerName}/search`,
       sortOptions: [
-        { label: 'Default', value: 'default' },
-        { label: 'Latest Updated', value: 'latest-updated' },
-        { label: 'Latest Added', value: 'latest-added' },
-        { label: 'Score', value: 'score' },
-        { label: 'Name A-Z', value: 'name-az' },
-        { label: 'Release Date', value: 'release-date' },
-        { label: 'Most Viewed', value: 'most-viewed' },
-        { label: 'Number of episodes', value: 'number_of_episodes' },
+        { label: 'Default', value: 'default' }, { label: 'Latest Updated', value: 'latest-updated' },
+        { label: 'Latest Added', value: 'latest-added' }, { label: 'Score', value: 'score' },
+        { label: 'Name A-Z', value: 'name-az' }, { label: 'Release Date', value: 'release-date' },
+        { label: 'Most Viewed', value: 'most-viewed' }, { label: 'Number of episodes', value: 'number_of_episodes' },
       ],
       filters: {
         type: ['Movie', 'Music', 'ONA', 'OVA', 'Special', 'TV'],
@@ -176,65 +174,68 @@ export function parseNavMenu(html, providerName = 'anikoto') {
 export function parseHome(html) {
   const $ = load(html);
   const genres = parseGenreList($);
-  const spotlightAnimes = each($, '#hotest .swiper-wrapper .swiper-slide.item', (el, i) => {
-    const href = $(el).find('a.btn.play').attr('href');
+  const spotlightAnimes = each($, '#hotest .swiper-wrapper .swiper-slide.item', (el, i) => ({
+    id: extractId($(el).find('a.btn.play').attr('href')),
+    name: $(el).find('.title.d-title').text().trim() || null,
+    jname: $(el).find('.title.d-title').attr('data-jp') || null,
+    poster: $(el).find('.image div').attr('style')?.match(/url\(['"]?([^)'"]+)['"]?\)/)?.[1] || null,
+    description: $(el).find('.synopsis').text().trim() || null,
+    rating: $(el).find('.meta i.rating').text().trim() || null,
+    rank: i + 1,
+    otherInfo: [$(el).find('.meta i.quality').text().trim(), $(el).find('.meta i.date').text().trim()].filter(Boolean),
+    genres: [],
+    episodes: { sub: $(el).find('.meta i.sub').length ? 1 : null, dub: $(el).find('.meta i.dub').length ? 1 : null },
+  }));
+  const latestEpisodeAnimes = each($, '#recent-update .ani.items .item', (el) => ({
+    id: extractId($(el).find('.ani.poster a').attr('href')),
+    tipId: extractTipId($, el),
+    name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
+    jname: $(el).find('.name.d-title').attr('data-jp') || null,
+    poster: $(el).find('img').attr('src'),
+    type: $(el).find('.meta .right').first().text().trim() || null,
+    episodes: parseEpisodes($, el),
+  }));
+  const newReleases = each($, '.top-tables section[data-name="new-release"] .scaff.items a.item', (el) => ({
+    id: extractId(el.attr('href')),
+    name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
+    jname: $(el).find('.name.d-title').attr('data-jp') || null,
+    poster: $(el).find('img').attr('src'),
+    type: null,
+    episodes: parseEpisodes($, el),
+  }));
+  const topUpcomingAnimes = each($, '.top-tables section[data-name="new-added"] .scaff.items a.item', (el) => ({
+    id: extractId(el.attr('href')),
+    name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
+    jname: $(el).find('.name.d-title').attr('data-jp') || null,
+    poster: $(el).find('img').attr('src'),
+    type: null,
+    episodes: parseEpisodes($, el),
+  }));
+  const today = each($, '.tab-content[data-name="day"] .scaff.side.items a.item', (el) => {
+    const rankClass = el.attr('class')?.match(/rank(\d+)/)?.[1];
     return {
-      id: extractId(href),
-      name: $(el).find('.title.d-title').text().trim() || null,
-      jname: $(el).find('.title.d-title').attr('data-jp') || null,
-      poster: $(el).find('.image div').attr('style')?.match(/url\(['"]?([^)'"]+)['"]?\)/)?.[1] || null,
-      description: $(el).find('.synopsis').text().trim() || null,
-      rating: $(el).find('.meta i.rating').text().trim() || null,
-      rank: i + 1,
-      otherInfo: [$(el).find('.meta i.quality').text().trim(), $(el).find('.meta i.date').text().trim()].filter(Boolean),
-      genres: [],
-      episodes: { sub: $(el).find('.meta i.sub').length ? 1 : null, dub: $(el).find('.meta i.dub').length ? 1 : null },
-    };
-  });
-  const latestEpisodeAnimes = each($, '#recent-update .ani.items .item', el => {
-    const href = $(el).find('.ani.poster a').attr('href');
-    return {
-      id: extractId(href), tipId: extractTipId($, el),
+      id: extractId(el.attr('href')),
+      rank: rankClass ? parseInt(rankClass, 10) : null,
       name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
-      jname: $(el).find('.name.d-title').attr('data-jp') || null,
       poster: $(el).find('img').attr('src'),
-      type: $(el).find('.meta .right').first().text().trim() || null,
       episodes: parseEpisodes($, el),
     };
   });
-  const newReleases = each($, '.top-tables section[data-name="new-release"] .scaff.items a.item', el => {
-    const href = el.attr('href');
-    return {
-      id: extractId(href),
-      name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
-      jname: $(el).find('.name.d-title').attr('data-jp') || null,
-      poster: $(el).find('img').attr('src'), type: null, episodes: parseEpisodes($, el),
-    };
-  });
-  const topUpcomingAnimes = each($, '.top-tables section[data-name="new-added"] .scaff.items a.item', el => {
-    const href = el.attr('href');
-    return {
-      id: extractId(href),
-      name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
-      jname: $(el).find('.name.d-title').attr('data-jp') || null,
-      poster: $(el).find('img').attr('src'), type: null, episodes: parseEpisodes($, el),
-    };
-  });
-  const parseTopTab = (tabName) => each($, `.tab-content[data-name="${tabName}"] .scaff.side.items a.item`, el => {
-    const href = el.attr('href');
-    const rankClass = el.attr('class')?.match(/rank(\d+)/)?.[1];
-    return {
-      id: extractId(href),
-      rank: rankClass ? parseInt(rankClass, 10) : num($(el).find('.rank').text().trim()),
-      name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
-      jname: $(el).find('.name.d-title').attr('data-jp') || null,
-      poster: $(el).find('img').attr('src'), episodes: parseEpisodes($, el),
-    };
-  });
-  return {
-    genres, spotlightAnimes, latestEpisodeAnimes, newReleases, topUpcomingAnimes,
-    top10Animes: { today: parseTopTab('day'), day: [], week: parseTopTab('week'), month: parseTopTab('month') },
-  };
+  const week = each($, '.tab-content[data-name="week"] .scaff.side.items a.item', (el) => ({
+    id: extractId(el.attr('href')),
+    rank: null,
+    name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
+    poster: $(el).find('img').attr('src'),
+    episodes: parseEpisodes($, el),
+  }));
+  const month = each($, '.tab-content[data-name="month"] .scaff.side.items a.item', (el) => ({
+    id: extractId(el.attr('href')),
+    rank: null,
+    name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
+    poster: $(el).find('img').attr('src'),
+    episodes: parseEpisodes($, el),
+  }));
+  return { genres, spotlightAnimes, latestEpisodeAnimes, newReleases, topUpcomingAnimes, top10Animes: { today, day: [], week, month } };
 }
 
 export function parseIndex(html) {
@@ -246,28 +247,26 @@ export function parseIndex(html) {
       ogImage: $('meta[property="og:image"]').attr('content') || null,
       canonical: $('link[rel="canonical"]').attr('href') || null,
     },
-    mostSearched: each($, '.search-term a.item', el => ({
-      label: el.text().trim().replace(/,?\s*$/, ''), keyword: el.text().trim().replace(/,?\s*$/, ''),
-    })),
+    mostSearched: each($, '.search-term a.item', el => ({ label: el.text().trim().replace(/,?\s*$/, ''), keyword: el.text().trim().replace(/,?\s*$/, '') })),
     genres: parseGenreList($),
     azList: each($, 'footer .azlist ul li a', el => ({ label: el.text().trim(), href: el.attr('href') || null })).filter(a => a.label),
-    footerMenu: each($, 'footer .inline-links ul li a', el => ({
-      label: $(el).find('span').text().trim() || el.text().trim(), href: el.attr('href') || null,
-    })).filter(m => m.label),
+    footerMenu: each($, 'footer .inline-links ul li a', el => ({ label: $(el).find('span').text().trim() || el.text().trim(), href: el.attr('href') || null })).filter(m => m.label),
   };
 }
 
 export function parseSearchFromHtml(html) {
   const $ = load(html);
   const animes = each($, '#list-items .item', el => parseAitem($, el));
-  const cur = getCurrentPage($), last = getLastPage($);
+  const cur = getCurrentPage($);
+  const last = getLastPage($);
   return { animes, currentPage: cur, totalPages: last, hasNextPage: cur < last, totalCount: null };
 }
 
 export function parseAzListFromHtml(html) {
   const $ = load(html);
   const animes = each($, '#list-items .item, .items .item', el => parseAitem($, el));
-  const cur = getCurrentPage($), last = getLastPage($);
+  const cur = getCurrentPage($);
+  const last = getLastPage($);
   return { sortOption: 'all', animes, currentPage: cur, totalPages: last, hasNextPage: cur < last };
 }
 
@@ -275,11 +274,12 @@ export function parseListPage(html) {
   const $ = load(html);
   const title = $('.head .title').first().text().trim() || null;
   const animes = each($, '#list-items .item, .items .item', el => parseAitem($, el));
-  const cur = getCurrentPage($), last = getLastPage($);
+  const cur = getCurrentPage($);
+  const last = getLastPage($);
   return { title, animes, currentPage: cur, totalPages: last, hasNextPage: cur < last };
 }
 
-// ─── Full Anime Detail from Watch Page HTML ────────────────────────
+// ─── Watch page HTML parser ─────────────────────────────────────────
 export function parseAnime(html) {
   const $ = load(html);
   const animeId = $('#watch-main').attr('data-id') || null;
@@ -287,11 +287,15 @@ export function parseAnime(html) {
   const dataUrl = $('#watch-main').attr('data-url') || '';
   const slugFromUrl = extractId(dataUrl || canonical);
   
-  const name = text($, 'h1.title.d-title') || null;
+  const name = text($, 'h1.title.d-title') || 
+    $('meta[property="og:title"]').attr('content')?.replace(/^Watch\s+/, '').replace(/\s+Episode\s+\d+.*$/i, '').trim() || null;
   const jname = attr($, 'h1.title.d-title', 'data-jp');
   const poster = attr($, '.poster img[itemprop="image"]', 'src') || $('meta[property="og:image"]').attr('content') || null;
+  
+  // Synonyms from .names div - all semicolon-separated items
   const synonymsRaw = text($, '.binfo .info .names');
-  const synonyms = synonymsRaw ? synonymsRaw.split(';')[0].trim() : null;
+  const synonyms = synonymsRaw || null;
+  
   const description = text($, '.synopsis .shorting .content') || $('meta[property="og:description"]').attr('content') || null;
   const rating = text($, '.meta i.rating');
   const hasSub = $('.meta i.sub').length > 0;
@@ -301,11 +305,9 @@ export function parseAnime(html) {
   const lastMeta = '.bmeta .meta:last-child';
   
   const type = detailValue($, firstMeta, 'Type:');
-  const premiered = detailLinks($, firstMeta, 'Premiered:')[0] || detailValue($, firstMeta, 'Premiered:');
+  const premiered = detailLinks($, firstMeta, 'Premiered:')[0] || null;
   const aired = detailValue($, firstMeta, 'Aired:');
   const status = detailLinks($, firstMeta, 'Status:')[0] || detailValue($, firstMeta, 'Status:');
-  
-  // ─── KEY: Extract genres properly from watch page ──────────────────
   const genres = detailLinks($, firstMeta, 'Genres:');
   
   const score = detailValue($, lastMeta, 'MAL:');
@@ -315,50 +317,46 @@ export function parseAnime(html) {
   const studios = detailLinks($, lastMeta, 'Studios:');
   const producers = detailLinks($, lastMeta, 'Producers:');
   
-  // MAL ID from script
+  // MAL ID from page script
   let malId = null;
   $('script').each((_, el) => {
     const script = $(el).html();
-    if (script && script.includes('mangaId')) {
+    if (script?.includes('mangaId')) {
       const match = script.match(/const\s+mangaId\s*=\s*(\d+)/);
       if (match) malId = match[1];
     }
   });
   
-  // Related from #watch-order (AJAX loaded, may be empty)
-  const related = [];
-  
-  // Recommended from last sidebar section
-  const recommended = each($, '.sidebar .w-side-section:last-child .scaff.side.items a.item', el => {
+  // Recommended (last sidebar section)
+  const recommended = each($, '.sidebar > section.w-side-section:last-child .scaff.side.items a.item', (el) => {
     const href = el.attr('href');
-    const dots = $(el).find('.meta span.dot');
-    const typeText = dots.eq(0).text().trim();
-    const epsText = dots.eq(1).text().trim();
-    const yearText = dots.eq(2).text().trim();
+    const typeText = $(el).find('.meta span.dot').eq(0).text().trim();
+    const epsText = $(el).find('.meta span.dot').eq(1).text().trim();
+    const yearText = $(el).find('.meta span.dot').eq(2).text().trim();
     return {
       id: extractId(href),
       name: $(el).find('.name.d-title').attr('data-jp') || $(el).find('.name.d-title').text().trim() || null,
       jname: $(el).find('.name.d-title').attr('data-jp') || null,
       poster: $(el).find('img').attr('src'),
       type: typeText || null,
+      duration: null,
       episodes: { sub: parseInt(epsText, 10) || null, dub: null },
       year: parseInt(yearText, 10) || null,
     };
   });
   
   return {
-    anime: {
-      id: slugFromUrl || animeId, animeId,
-      name, jname, synonyms, japanese: jname, poster, description, type, rating,
-      episodes: { sub: hasSub ? 1 : null, dub: hasDub ? 1 : null },
-      duration, premiered, aired, broadcast: null, status, score, episodesTotal,
-      country: null, genres, studios, producers, malId, alId: null,
-    },
-    related, recommended, seasons: [],
+    anime: { id: slugFromUrl || animeId, animeId, name, jname, synonyms, japanese: jname, poster, description, type, rating,
+      episodes: { sub: hasSub ? 1 : null, dub: hasDub ? 1 : null }, duration, premiered, aired, broadcast: null, status, score,
+      episodesTotal, country: null, genres, studios, producers, malId, alId: null },
+    related: [],
+    recommended,
+    seasons: [],
   };
 }
 
 // ─── JSON API parsers ──────────────────────────────────────────────
+
 export function parseAnimeFromJson(data) {
   if (!data.ok) throw new Error('Invalid JSON API response');
   const d = data.data.anime;
@@ -373,9 +371,9 @@ export function parseAnimeFromJson(data) {
       duration: d.duration || null, premiered: null, aired: d.aired || null,
       broadcast: null, status: d.status || null, score: null,
       episodesTotal: parseInt(d.episodes, 10) || null, country: null,
-      genres: d.terms_by_type?.genre?.filter(g => g && g !== 'unknown') || [],
-      studios: d.terms_by_type?.studios?.filter(s => s && s !== 'unknown') || [],
-      producers: d.terms_by_type?.producers?.filter(p => p && p !== 'unknown') || [],
+      genres: d.terms_by_type?.genre || [],
+      studios: d.terms_by_type?.studios || [],
+      producers: d.terms_by_type?.producers || [],
       malId: d.mal_id || null, alId: d.ani_id || null,
     },
     related: [], recommended: [], seasons: [],
@@ -384,15 +382,18 @@ export function parseAnimeFromJson(data) {
 
 export function parseEpisodesFromJson(data) {
   if (!data.ok) throw new Error('Invalid JSON API response');
-  const d = data.data;
-  const anime = d.anime;
-  const episodesList = d.episodes || [];
+  const anime = data.data.anime;
+  const episodesList = data.data.episodes || [];
   return {
     totalEpisodes: episodesList.length,
-    malId: anime.mal_id || null, alId: anime.ani_id || null,
+    malId: anime.mal_id || null,
+    alId: anime.ani_id || null,
     episodes: episodesList.map(ep => ({
-      number: ep.number, title: ep.title || `${anime.title} - Episode ${ep.number}`,
-      isFiller: false, hasSub: !!ep.embed_url?.sub, hasDub: !!ep.embed_url?.dub,
+      number: ep.number,
+      title: ep.title || `${anime.title} - Episode ${ep.number}`,
+      isFiller: false,
+      hasSub: !!ep.embed_url?.sub,
+      hasDub: !!ep.embed_url?.dub,
       sources: {
         ...(ep.embed_url?.sub ? { sub: ep.embed_url.sub } : {}),
         ...(ep.embed_url?.dub ? { dub: ep.embed_url.dub } : {}),
@@ -401,75 +402,81 @@ export function parseEpisodesFromJson(data) {
   };
 }
 
-// ─── MERGE FUNCTION (FIXED) ────────────────────────────────────────
+// ─── Smart merge: JSON + HTML data ─────────────────────────────────
 export function mergeAnimeData(jsonResult, htmlResult) {
-  const jA = jsonResult?.anime || {};
-  const hA = htmlResult?.anime || {};
-  const jR = jsonResult?.related || [];
-  const hR = htmlResult?.related || [];
-  const jRec = jsonResult?.recommended || [];
-  const hRec = htmlResult?.recommended || [];
+  const j = jsonResult?.anime || {};
+  const h = htmlResult?.anime || {};
 
-  // Pick first truthy value that isn't "unknown" or empty array
-  const pick = (prefer, fallback) => {
-    // If prefer is a non-empty array, use it
-    if (Array.isArray(prefer) && prefer.length > 0) return prefer;
-    // If prefer is truthy and not 'unknown', use it
-    if (prefer && prefer !== 'unknown' && !(Array.isArray(prefer) && prefer.length === 0)) return prefer;
-    // Fallback
-    if (Array.isArray(fallback) && fallback.length > 0) return fallback;
-    if (fallback && fallback !== 'unknown' && !(Array.isArray(fallback) && fallback.length === 0)) return fallback;
-    return Array.isArray(prefer) ? [] : null;
+  // Helper: pick first value that's not null/undefined/empty-string/"unknown"
+  const val = (...args) => {
+    for (const v of args) {
+      if (v !== null && v !== undefined && v !== '' && v !== 'unknown') return v;
+    }
+    return args[0]; // return first even if null
   };
 
-  // Special array filter: remove 'unknown' entries
-  const cleanArr = (arr) => (arr || []).filter(v => v && v !== 'unknown');
+  // Helper: pick best array (not empty, not just ["unknown"])
+  const arr = (jsonArr, htmlArr) => {
+    const jArr = (jsonArr || []).filter(v => v && v !== 'unknown');
+    const hArr = (htmlArr || []).filter(v => v && v !== 'unknown');
+    if (jArr.length > 0) return jArr;
+    if (hArr.length > 0) return hArr;
+    // Both empty after filtering - use raw arrays
+    return (jsonArr?.length > 0) ? jsonArr : (htmlArr || []);
+  };
 
-  const anime = {
-    id: pick(jA.id, hA.id),
-    animeId: pick(jA.animeId, hA.animeId),
-    name: pick(jA.name, hA.name),
-    jname: pick(jA.jname, hA.jname),
-    synonyms: pick(jA.synonyms, hA.synonyms),
-    japanese: pick(jA.japanese, hA.japanese),
-    poster: pick(jA.poster, hA.poster),
-    // Description: HTML is richer, JSON is backup after stripping tags
-    description: hA.description || jA.description?.replace(/<[^>]+>/g, '').trim() || null,
-    type: pick(hA.type, jA.type),
-    rating: pick(hA.rating, jA.rating),
+  // Clean duration (remove duplicate "min")
+  const cleanDuration = (d) => {
+    if (!d) return null;
+    return d.replace(/\s*min\s*min$/i, ' min').replace(/min min$/i, 'min').trim() || null;
+  };
+
+  const merged = {
+    id: val(j.id, h.id),
+    animeId: val(j.animeId, h.animeId),
+    name: val(j.name, h.name),
+    jname: val(j.jname, h.jname),
+    synonyms: val(j.synonyms, h.synonyms),  // JSON has full semicolon list
+    japanese: val(j.japanese, h.japanese),
+    poster: val(j.poster, h.poster),
+    description: val(h.description, j.description),  // HTML description is usually richer
+    type: val(h.type, j.type),                       // HTML type is more accurate
+    rating: val(h.rating, j.rating),
     episodes: {
-      sub: pick(jA.episodes?.sub, hA.episodes?.sub),
-      dub: pick(jA.episodes?.dub, hA.episodes?.dub),
+      sub: val(j.episodes?.sub, h.episodes?.sub),
+      dub: val(j.episodes?.dub, h.episodes?.dub),
     },
-    duration: pick(hA.duration, jA.duration),
-    premiered: pick(hA.premiered, jA.premiered),
-    aired: pick(hA.aired, jA.aired),
-    broadcast: pick(jA.broadcast, hA.broadcast),
-    status: pick(hA.status, jA.status),
-    score: pick(hA.score, jA.score),
-    episodesTotal: pick(jA.episodesTotal, hA.episodesTotal),
-    country: pick(jA.country, hA.country),
-    // ─── KEY FIX: Genres/studios/producers ──────────────────────
-    // HTML from watch page is authoritative if it has data
-    genres: cleanArr(hA.genres).length > 0 ? cleanArr(hA.genres) : cleanArr(jA.genres),
-    studios: cleanArr(hA.studios).length > 0 ? cleanArr(hA.studios) : cleanArr(jA.studios),
-    producers: cleanArr(hA.producers).length > 0 ? cleanArr(hA.producers) : cleanArr(jA.producers),
-    malId: pick(jA.malId, hA.malId),
-    alId: pick(jA.alId, hA.alId),
+    duration: cleanDuration(val(h.duration, j.duration)),
+    premiered: val(h.premiered, j.premiered),
+    aired: val(h.aired, j.aired),
+    broadcast: val(j.broadcast, h.broadcast),
+    status: val(h.status, j.status),
+    score: val(h.score, j.score),
+    episodesTotal: val(j.episodesTotal, h.episodesTotal),
+    country: val(j.country, h.country),
+    genres: arr(j.genres, h.genres),
+    studios: arr(j.studios, h.studios),
+    producers: arr(j.producers, h.producers),
+    malId: val(j.malId, h.malId),
+    alId: val(j.alId, h.alId),
   };
 
-  // Deduplicate related/recommended
+  const jsonRelated = jsonResult?.related || [];
+  const htmlRelated = htmlResult?.related || [];
+  const jsonRecommended = jsonResult?.recommended || [];
+  const htmlRecommended = htmlResult?.recommended || [];
+
   const seen = new Set();
   const dedupe = (items) => items.filter(item => {
-    if (!item?.id || seen.has(item.id)) return false;
+    if (!item.id || seen.has(item.id)) return false;
     seen.add(item.id);
     return true;
   });
 
   return {
-    anime,
-    related: dedupe([...jR, ...hR]),
-    recommended: dedupe([...hRec, ...jRec]), // HTML recommended first (they're actually the sidebar)
+    anime: merged,
+    related: dedupe([...jsonRelated, ...htmlRelated]),
+    recommended: dedupe([...jsonRecommended, ...htmlRecommended]),
     seasons: jsonResult?.seasons || htmlResult?.seasons || [],
   };
 }
