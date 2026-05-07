@@ -30,6 +30,12 @@
     >
       Feature request
     </a>
+      ·
+    <a 
+      href="https://github.com/senpaiorbit/hanime-api-rebuild-/issues/new?assignees=&labels=enhancement&template=more-provider.md"
+    >
+      More Provider
+    </a>
   </div>
 </div>
 
