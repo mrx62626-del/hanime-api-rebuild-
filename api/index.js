@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { handle } from '@hono/node-server/vercel';
 import { getProvider } from '../core/providerManager.js';
+import { cacheStats, cacheDel } from '../utils/cache.js';
 
 const app = new Hono();
 
@@ -25,6 +26,7 @@ app.get('/', (c) => c.json({
     type: '/api/v2/{provider}/type/{name}',
     azlist: '/api/v2/{provider}/azlist/{sort}',
     nav: '/api/v2/{provider}/nav',
+    cacheStats: '/cache/stats',
   }
 }));
 
@@ -38,6 +40,9 @@ function err(c, message, status = 500) {
   console.error(`[ERROR] ${message}`);
   return c.json({ success: false, error: message }, status);
 }
+
+// ─── Cache stats (debug) ──────────────────────────────────────────────────────
+app.get('/cache/stats', (c) => c.json({ success: true, cache: cacheStats() }));
 
 // ─── Home ─────────────────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/home', async (c) => {
