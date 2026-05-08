@@ -1,22 +1,30 @@
 // utils/cache.js
-// Simple in-memory TTL cache for API responses.
-// Reduces redundant upstream requests for frequently-accessed data.
+// ─── Simple in-memory TTL cache ───────────────────────────────────────────────
+// Works on every runtime (Node / Vercel serverless / edge).
+// Each entry stores the value + the absolute expiry timestamp.
+// A periodic sweep removes stale entries so memory doesn't grow unbounded.
 
-const store = new Map();
+const store = new Map(); // key → { value, expiresAt }
 
-// Default TTLs (milliseconds)
+// ─── TTL presets (seconds) ────────────────────────────────────────────────────
 export const TTL = {
-  HOME:    5  * 60 * 1000,  // 5 min  – home/index pages change often
-  LIST:    10 * 60 * 1000,  // 10 min – genre/category/browse/azlist
-  ANIME:   30 * 60 * 1000,  // 30 min – anime detail pages
-  EPISODE: 60 * 60 * 1000,  // 60 min – episode data is very stable
-  SEARCH:  2  * 60 * 1000,  // 2 min  – search results change quickly
-  NAV:     60 * 60 * 1000,  // 60 min – nav menus rarely change
+  HOME:     5  * 60,   //   5 min  – home / index pages change often
+  SEARCH:   3  * 60,   //   3 min  – search results
+  BROWSE:   5  * 60,   //   5 min  – browse / filter lists
+  ANIME:    60 * 60,   //   1 hr   – anime detail (very stable)
+  EPISODES: 30 * 60,   //  30 min  – episode list
+  EPISODE:  30 * 60,   //  30 min  – single episode / sources
+  GENRE:    10 * 60,   //  10 min  – genre / category / type pages
+  AZLIST:   60 * 60,   //   1 hr   – A-Z list
+  NAV:      60 * 60,   //   1 hr   – nav menu (rarely changes)
 };
 
+// ─── Core helpers ─────────────────────────────────────────────────────────────
+
 /**
- * Get a cached value.
- * Returns the stored value or undefined if missing / expired.
+ * Return the cached value for `key`, or undefined if absent / expired.
+ * @param {string} key
+ * @returns {*}
  */
 export function cacheGet(key) {
   const entry = store.get(key);
@@ -29,57 +37,90 @@ export function cacheGet(key) {
 }
 
 /**
- * Store a value in the cache.
+ * Store `value` under `key` with a TTL in seconds.
  * @param {string} key
  * @param {*}      value
- * @param {number} ttl   – milliseconds until expiry (use TTL.* constants)
+ * @param {number} ttlSeconds
  */
-export function cacheSet(key, value, ttl) {
-  store.set(key, { value, expiresAt: Date.now() + ttl });
+export function cacheSet(key, value, ttlSeconds) {
+  store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
 }
 
 /**
- * Delete a specific cache entry.
+ * Delete a specific key (useful for manual invalidation).
+ * @param {string} key
  */
 export function cacheDel(key) {
   store.delete(key);
 }
 
 /**
- * Remove all expired entries.
- * Called automatically on every write; safe to call manually.
+ * Remove all entries whose TTL has expired.
+ * Called automatically on a fixed interval, but also exported if you
+ * want to trigger it manually.
  */
-export function cachePrune() {
+export function cachePurge() {
   const now = Date.now();
-  for (const [key, entry] of store) {
-    if (now > entry.expiresAt) store.delete(key);
+  for (const [k, v] of store) {
+    if (now > v.expiresAt) store.delete(k);
   }
 }
 
-/**
- * Convenience: return cached result or call fn(), cache it, then return it.
- *
- * @param {string}   key
- * @param {number}   ttl
- * @param {Function} fn  – async function that returns the fresh data
- */
-export async function withCache(key, ttl, fn) {
-  const hit = cacheGet(key);
-  if (hit !== undefined) return hit;
-  const value = await fn();
-  cacheSet(key, value, ttl);
-  cachePrune();            // opportunistic cleanup
-  return value;
-}
+// Auto-purge every 10 minutes so the Map never grows stale forever.
+// `unref()` ensures the timer doesn't keep the process alive on exit.
+const purgeTimer = setInterval(cachePurge, 10 * 60 * 1000);
+if (purgeTimer.unref) purgeTimer.unref();
+
+// ─── Route helper ─────────────────────────────────────────────────────────────
 
 /**
- * Return cache stats (useful for a /cache/stats debug endpoint).
+ * Cache-aware wrapper for Hono route handlers.
+ *
+ * Usage:
+ *   return withCache(c, TTL.ANIME, () => provider.anime.getById(id));
+ *
+ * • Skips the cache when ?nocache=1 is in the query string.
+ * • Sets X-Cache: HIT | MISS and X-Cache-TTL on the response.
+ * • On a HIT the data object gets a `_cached: true` flag.
+ * • On error the result is NOT cached so the next request tries fresh.
+ *
+ * @param {import('hono').Context} c          Hono context
+ * @param {number}                 ttlSeconds Cache lifetime
+ * @param {() => Promise<*>}       fn         Async function that fetches data
+ * @returns {Promise<Response>}
  */
+export async function withCache(c, ttlSeconds, fn) {
+  // Allow callers to bypass cache for debugging.
+  const bypass = c.req.query('nocache') === '1';
+  const key = c.req.url; // full URL including query string → natural cache key
+
+  if (!bypass) {
+    const hit = cacheGet(key);
+    if (hit !== undefined) {
+      c.header('X-Cache', 'HIT');
+      c.header('X-Cache-TTL', String(ttlSeconds));
+      return c.json({ success: true, data: { ...hit, _cached: true } });
+    }
+  }
+
+  // Cache miss – run the real fetch.
+  c.header('X-Cache', 'MISS');
+  c.header('X-Cache-TTL', String(ttlSeconds));
+
+  const data = await fn(); // throws on error → caller's try/catch handles it
+  if (!bypass) cacheSet(key, data, ttlSeconds);
+  return c.json({ success: true, data });
+}
+
+// ─── Stats (optional, useful for a /cache/stats endpoint) ────────────────────
+
+/** Return basic statistics about the current cache state. */
 export function cacheStats() {
   const now = Date.now();
-  let active = 0, expired = 0;
-  for (const entry of store.values()) {
-    now > entry.expiresAt ? expired++ : active++;
+  let alive = 0;
+  let expired = 0;
+  for (const v of store.values()) {
+    now > v.expiresAt ? expired++ : alive++;
   }
-  return { total: store.size, active, expired };
+  return { totalKeys: store.size, aliveKeys: alive, expiredKeys: expired };
 }
