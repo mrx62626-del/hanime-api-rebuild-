@@ -26,6 +26,25 @@ app.get('/', (c) => c.json({
     type: '/api/v2/{provider}/type/{name}',
     azlist: '/api/v2/{provider}/azlist/{sort}',
     nav: '/api/v2/{provider}/nav',
+    miruro: {
+      note: 'Miruro routes are served by the Python runtime at /providers/miruro/*',
+      search: '/providers/miruro/search?q=',
+      suggestions: '/providers/miruro/suggestions?q=',
+      filter: '/providers/miruro/filter',
+      spotlight: '/providers/miruro/spotlight',
+      trending: '/providers/miruro/trending',
+      popular: '/providers/miruro/popular',
+      upcoming: '/providers/miruro/upcoming',
+      recent: '/providers/miruro/recent',
+      schedule: '/providers/miruro/schedule',
+      info: '/providers/miruro/info/{anilist_id}',
+      characters: '/providers/miruro/anime/{anilist_id}/characters',
+      relations: '/providers/miruro/anime/{anilist_id}/relations',
+      recommendations: '/providers/miruro/anime/{anilist_id}/recommendations',
+      episodes: '/providers/miruro/episodes/{anilist_id}',
+      sources: '/providers/miruro/sources',
+      watch: '/providers/miruro/watch/{provider}/{anilist_id}/{category}/{slug}',
+    }
   }
 }));
 
@@ -392,6 +411,11 @@ app.get('/api/nav', async (c) => {
     return err(c, e.message);
   }
 });
+
+// ─── Miruro info routes (Hono documents them; Python runtime actually handles them) ──
+// These 404 stubs ensure /providers/miruro/* is routed by vercel.json BEFORE
+// reaching this handler — Hono never actually receives these requests in production.
+// They are here only so local dev / tooling can surface them in the route list.
 
 // ─── Error handler ────────────────────────────────────────────────────────────
 app.onError((error, c) => {
