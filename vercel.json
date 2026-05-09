@@ -1,12 +1,25 @@
 {
   "version": 2,
   "functions": {
-    "api/*.js": {
+    "api/index.js": {
+      "runtime": "nodejs20.x",
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "providers/miruro/api.py": {
+      "runtime": "@vercel/python",
       "memory": 1024,
       "maxDuration": 30
     }
   },
   "routes": [
-    { "src": "/(.*)", "dest": "/api/index.js" }
+    {
+      "src": "/providers/miruro/(.*)",
+      "dest": "/providers/miruro/api.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.js"
+    }
   ]
 }
