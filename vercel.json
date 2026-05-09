@@ -1,24 +1,25 @@
 {
   "version": 2,
-  "functions": {
-    "api/index.js": {
-      "memory": 1024,
-      "maxDuration": 30
+
+  "builds": [
+    {
+      "src": "providers/miruro/api.py",
+      "use": "@vercel/python"
     },
-    "providers/miruro/api.py": {
-      "runtime": "@vercel/python@3.0.7",
-      "memory": 1024,
-      "maxDuration": 30
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
+
   "routes": [
     {
-      "src": "/providers/miruro/(.*)",
-      "dest": "/providers/miruro/api.py"
+      "src": "^/providers/miruro/(.*)$",
+      "dest": "providers/miruro/api.py"
     },
     {
-      "src": "/(.*)",
-      "dest": "/api/index.js"
+      "src": "^/(.*)$",
+      "dest": "api/index.js"
     }
   ]
 }
