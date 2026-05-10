@@ -10,7 +10,7 @@ const app = new Hono();
 app.get('/', (c) => c.json({
   status: 'ok',
   message: 'Anime API',
-  providers: ['anikai', 'anikoto'],
+  providers: ['anikai', 'anikoto', 'miruro'],
   defaultProvider: 'anikoto',
   docs: 'See README.md for endpoint documentation',
   endpoints: {
@@ -27,23 +27,23 @@ app.get('/', (c) => c.json({
     azlist: '/api/v2/{provider}/azlist/{sort}',
     nav: '/api/v2/{provider}/nav',
     miruro: {
-      note: 'Miruro routes are served by the Python runtime at /providers/miruro/*',
-      search: '/providers/miruro/search?q=',
-      suggestions: '/providers/miruro/suggestions?q=',
-      filter: '/providers/miruro/filter',
-      spotlight: '/providers/miruro/spotlight',
-      trending: '/providers/miruro/trending',
-      popular: '/providers/miruro/popular',
-      upcoming: '/providers/miruro/upcoming',
-      recent: '/providers/miruro/recent',
-      schedule: '/providers/miruro/schedule',
-      info: '/providers/miruro/info/{anilist_id}',
-      characters: '/providers/miruro/anime/{anilist_id}/characters',
-      relations: '/providers/miruro/anime/{anilist_id}/relations',
-      recommendations: '/providers/miruro/anime/{anilist_id}/recommendations',
-      episodes: '/providers/miruro/episodes/{anilist_id}',
-      sources: '/providers/miruro/sources',
-      watch: '/providers/miruro/watch/{provider}/{anilist_id}/{category}/{slug}',
+      note: 'Miruro routes served by the Python runtime — all responses use { success, data } format',
+      search: '/api/v2/miruro/search?query=',
+      suggestions: '/api/v2/miruro/suggestions?query=',
+      filter: '/api/v2/miruro/filter',
+      spotlight: '/api/v2/miruro/spotlight',
+      trending: '/api/v2/miruro/trending',
+      popular: '/api/v2/miruro/popular',
+      upcoming: '/api/v2/miruro/upcoming',
+      recent: '/api/v2/miruro/recent',
+      schedule: '/api/v2/miruro/schedule',
+      info: '/api/v2/miruro/info/{anilist_id}',
+      characters: '/api/v2/miruro/anime/{anilist_id}/characters',
+      relations: '/api/v2/miruro/anime/{anilist_id}/relations',
+      recommendations: '/api/v2/miruro/anime/{anilist_id}/recommendations',
+      episodes: '/api/v2/miruro/episodes/{anilist_id}',
+      sources: '/api/v2/miruro/sources',
+      watch: '/api/v2/miruro/watch/{provider}/{anilist_id}/{category}/{slug}',
     }
   }
 }));
@@ -412,10 +412,9 @@ app.get('/api/nav', async (c) => {
   }
 });
 
-// ─── Miruro info routes (Hono documents them; Python runtime actually handles them) ──
-// These 404 stubs ensure /providers/miruro/* is routed by vercel.json BEFORE
-// reaching this handler — Hono never actually receives these requests in production.
-// They are here only so local dev / tooling can surface them in the route list.
+// ─── Miruro routes (Python runtime handles /api/v2/miruro/* via vercel.json) ──
+// vercel.json routes ^/api/v2/miruro/(.*) → providers/miruro/api.py BEFORE
+// reaching this Hono handler, so these requests never arrive here in production.
 
 // ─── Error handler ────────────────────────────────────────────────────────────
 app.onError((error, c) => {
