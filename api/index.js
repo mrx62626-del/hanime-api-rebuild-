@@ -335,7 +335,7 @@ console.log(
   // Final response
   // --------------------------------------------------
 
-  return {
+   return {
 
     animeId,
 
@@ -363,6 +363,13 @@ console.log(
       episodeData?.outro
       || null
   };
+
+    });
+
+  } catch (e) {
+
+    return err(c, e.message);
+  }
 });
 
 // ─── Search ───────────────────────────────────────────────────────────────────
