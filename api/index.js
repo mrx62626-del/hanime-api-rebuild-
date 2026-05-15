@@ -4,76 +4,9 @@ import { handle } from '@hono/node-server/vercel';
 import { getProvider, getProviderWithFallback } from '../core/providerManager.js';
 import { withCache, TTL, cacheStats } from '../utils/cache.js';
 import { serve } from '@hono/node-server';
-import * as cheerio from 'cheerio';
-import { chromium } from 'playwright';
 
 const app = new Hono();
 
-async function extractKwikFromMegaPlay(url) {
-
-  let browser;
-
-  try {
-
-    browser =
-      await chromium.launch({
-        headless: true
-      });
-
-    const page =
-      await browser.newPage();
-
-    await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: 60000
-    });
-
-    // wait a little extra
-    await page.waitForTimeout(3000);
-
-    // find iframe
-    const iframe =
-      await page.evaluate(() => {
-
-        const iframes =
-          Array.from(
-            document.querySelectorAll('iframe')
-          );
-
-        for (const iframe of iframes) {
-
-          const src =
-            iframe.src || '';
-
-          if (
-            src.includes('kwik.cx')
-          ) {
-
-            return src;
-          }
-        }
-
-        return null;
-      });
-
-    await browser.close();
-
-    return iframe;
-
-  } catch (e) {
-
-    if (browser) {
-      await browser.close();
-    }
-
-    console.error(
-      '[PLAYWRIGHT KWIK ERROR]',
-      e
-    );
-
-    return null;
-  }
-}
 // ─── Root ────────────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
   status: 'ok',
@@ -174,6 +107,7 @@ app.get('/api/v2/:provider/anime/:animeId/episodes', async (c) => {
 });
 
 // ─── Single episode ───────────────────────────────────────────────────────────
+// ─── Single episode ───────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
 
   try {
@@ -202,11 +136,6 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
         );
 
       console.log(
-        '[EPISODE KEYS]',
-        Object.keys(episodeData || {})
-      );
-
-      console.log(
         '[FULL RAW]',
         JSON.stringify(
           episodeData,
@@ -216,7 +145,7 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
       );
 
       // --------------------------------------------------
-      // Allowed filters
+      // Direct Megaplay sources
       // --------------------------------------------------
 
       const subUrl =
@@ -231,30 +160,6 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
           ?.dub
         || null;
 
-      // ----------------------------------
-      // Extract real kwik
-      // ----------------------------------
-
-      const subKwik =
-        subUrl
-          ? await extractKwikFromMegaPlay(subUrl)
-          : null;
-
-      const dubKwik =
-        dubUrl
-          ? await extractKwikFromMegaPlay(dubUrl)
-          : null;
-
-      console.log(
-        '[KWIK SUB]',
-        subKwik
-      );
-
-      console.log(
-        '[KWIK DUB]',
-        dubKwik
-      );
-
       // --------------------------------------------------
       // Final response
       // --------------------------------------------------
@@ -267,26 +172,26 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
           episodeNumber,
 
         iframe:
-          subKwik
-          || dubKwik
+          subUrl
+          || dubUrl
           || null,
 
         preferredServers: {
 
-          sub: subKwik
+          sub: subUrl
             ? [
                 {
                   quality: 'SUB',
-                  url: subKwik
+                  url: subUrl
                 }
               ]
             : [],
 
-          dub: dubKwik
+          dub: dubUrl
             ? [
                 {
                   quality: 'DUB',
-                  url: dubKwik
+                  url: dubUrl
                 }
               ]
             : []
@@ -302,7 +207,6 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
   }
 
 });
-
 // ─── AZ List ──────────────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/azlist/:sortOption', async (c) => {
   try {
