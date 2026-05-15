@@ -16,12 +16,32 @@ async function extractKwikFromMegaPlay(url) {
       await fetch(url, {
         headers: {
           'User-Agent':
-            'Mozilla/5.0'
+            'Mozilla/5.0',
+          'Referer':
+            'https://anikoto.to/'
         }
       });
 
     const html =
       await response.text();
+
+    // ----------------------------------
+    // Regex extraction
+    // ----------------------------------
+
+    const kwikMatch =
+      html.match(
+        /https?:\/\/kwik\.cx\/e\/[^"' ]+/i
+      );
+
+    if (kwikMatch) {
+
+      return kwikMatch[0];
+    }
+
+    // ----------------------------------
+    // Fallback iframe parse
+    // ----------------------------------
 
     const $ =
       cheerio.load(html);
@@ -35,10 +55,7 @@ async function extractKwikFromMegaPlay(url) {
 
       if (
         src &&
-        (
-          src.includes('kwik')
-          || src.includes('kiwi')
-        )
+        src.includes('kwik.cx')
       ) {
 
         iframe = src;
@@ -57,7 +74,6 @@ async function extractKwikFromMegaPlay(url) {
     return null;
   }
 }
-
 // ─── Root ────────────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
   status: 'ok',
