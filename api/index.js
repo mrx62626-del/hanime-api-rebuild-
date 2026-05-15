@@ -130,6 +130,16 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
 
   const episodeData =
     await p.anime.getEpisode(
+
+      console.log(
+  '[RAW EPISODE]',
+  JSON.stringify(
+    episodeData,
+    null,
+    2
+  )
+);
+      
       animeId,
       episodeNumber
     );
