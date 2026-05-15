@@ -8,8 +8,6 @@ import * as cheerio from 'cheerio';
 
 const app = new Hono();
 
-const app = new Hono();
-
 async function extractKwikFromMegaPlay(url) {
 
   try {
