@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { handle } from '@hono/node-server/vercel';
 import { getProvider, getProviderWithFallback } from '../core/providerManager.js';
 import { withCache, TTL, cacheStats } from '../utils/cache.js';
+import { serve } from '@hono/node-server';
 
 const app = new Hono();
 
@@ -424,6 +425,15 @@ app.onError((error, c) => {
   console.error('[FATAL]', error);
   return err(c, error.message);
 });
+
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  const port = process.env.PORT || 3000;
+  console.log(`Server is running on port ${port}`);
+  serve({
+    fetch: app.fetch,
+    port: Number(port)
+  });
+}
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 export default handle(app);
