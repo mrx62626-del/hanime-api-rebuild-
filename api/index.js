@@ -169,145 +169,122 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
 
     return withCache(c, TTL.EPISODE, async () => {
 
-  const animeId =
-    c.req.param('animeId');
+      const animeId =
+        c.req.param('animeId');
 
-  const episodeNumber =
-    c.req.param('number');
+      const episodeNumber =
+        c.req.param('number');
 
-  // --------------------------------------------------
-  // Fetch episode data
-  // --------------------------------------------------
-const episodeData =
-  await p.anime.getEpisode(
-    animeId,
-    episodeNumber
-  );
+      // --------------------------------------------------
+      // Fetch episode data
+      // --------------------------------------------------
 
-console.log(
-  '[EPISODE KEYS]',
-  Object.keys(episodeData || {})
-);
+      const episodeData =
+        await p.anime.getEpisode(
+          animeId,
+          episodeNumber
+        );
 
-console.log(
-  '[FULL RAW]',
-  JSON.stringify(
-    episodeData,
-    null,
-    2
-  )
-);
+      console.log(
+        '[EPISODE KEYS]',
+        Object.keys(episodeData || {})
+      );
 
-  // --------------------------------------------------
-  // Allowed filters
-  // --------------------------------------------------
+      console.log(
+        '[FULL RAW]',
+        JSON.stringify(
+          episodeData,
+          null,
+          2
+        )
+      );
 
-const subUrl =
-  episodeData?.episode
-    ?.sources
-    ?.sub
-  || null;
+      // --------------------------------------------------
+      // Allowed filters
+      // --------------------------------------------------
 
-const dubUrl =
-  episodeData?.episode
-    ?.sources
-    ?.dub
-  || null;
+      const subUrl =
+        episodeData?.episode
+          ?.sources
+          ?.sub
+        || null;
 
-// ----------------------------------
-// Extract real kwik
-// ----------------------------------
+      const dubUrl =
+        episodeData?.episode
+          ?.sources
+          ?.dub
+        || null;
 
-const subKwik =
-  subUrl
-    ? await extractKwikFromMegaPlay(subUrl)
-    : null;
+      // ----------------------------------
+      // Extract real kwik
+      // ----------------------------------
 
-const dubKwik =
-  dubUrl
-    ? await extractKwikFromMegaPlay(dubUrl)
-    : null;
+      const subKwik =
+        subUrl
+          ? await extractKwikFromMegaPlay(subUrl)
+          : null;
 
-console.log(
-  '[KWIK SUB]',
-  subKwik
-);
+      const dubKwik =
+        dubUrl
+          ? await extractKwikFromMegaPlay(dubUrl)
+          : null;
 
-console.log(
-  '[KWIK DUB]',
-  dubKwik
-);
-  // --------------------------------------------------
-  // Final response
-  // --------------------------------------------------
+      console.log(
+        '[KWIK SUB]',
+        subKwik
+      );
 
-   return {
+      console.log(
+        '[KWIK DUB]',
+        dubKwik
+      );
 
-  animeId,
+      // --------------------------------------------------
+      // Final response
+      // --------------------------------------------------
 
-  episode:
-    episodeNumber,
+      return {
 
-  iframe:
-    subKwik
-    || dubKwik
-    || null,
+        animeId,
 
-  preferredServers: {
+        episode:
+          episodeNumber,
 
-    sub: subKwik
-      ? [
-          {
-            quality: 'SUB',
-            url: subKwik
-          }
-        ]
-      : [],
+        iframe:
+          subKwik
+          || dubKwik
+          || null,
 
-    dub: dubKwik
-      ? [
-          {
-            quality: 'DUB',
-            url: dubKwik
-          }
-        ]
-      : []
-  }
-};
-// ─── Search ───────────────────────────────────────────────────────────────────
-app.get('/api/v2/:provider/search', async (c) => {
-  try {
-    const q = c.req.query('q');
-    if (!q) return err(c, 'Missing query parameter: q', 400);
-    
-    const p = await getProvider(c.req.param('provider'));
-    const page = parseInt(c.req.query('page') || '1', 10);
-    
-    // Extract all filters except q, page, provider
-    const { q: _q, page: _p, provider: _pr, ...filters } = Object.fromEntries(
-      Object.entries(c.req.query()).filter(([k]) => !['q', 'page', 'provider'].includes(k))
-    );
-    
-    return withCache(c, TTL.SEARCH, () => p.search.query(q, page, filters));
+        preferredServers: {
+
+          sub: subKwik
+            ? [
+                {
+                  quality: 'SUB',
+                  url: subKwik
+                }
+              ]
+            : [],
+
+          dub: dubKwik
+            ? [
+                {
+                  quality: 'DUB',
+                  url: dubKwik
+                }
+              ]
+            : []
+        }
+      };
+
+    });
+
   } catch (e) {
-    return err(c, e.message);
-  }
-});
 
-// ─── Browse ───────────────────────────────────────────────────────────────────
-app.get('/api/v2/:provider/browse', async (c) => {
-  try {
-    const p = await getProvider(c.req.param('provider'));
-    const page = parseInt(c.req.query('page') || '1', 10);
-    
-    const { page: _p, provider: _pr, ...filters } = Object.fromEntries(
-      Object.entries(c.req.query()).filter(([k]) => !['page', 'provider'].includes(k))
-    );
-    
-    return withCache(c, TTL.BROWSE, () => p.search.browse(filters, page));
-  } catch (e) {
     return err(c, e.message);
+
   }
+
 });
 
 // ─── AZ List ──────────────────────────────────────────────────────────────────
