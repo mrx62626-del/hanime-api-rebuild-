@@ -127,11 +127,13 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
   // --------------------------------------------------
   // Fetch episode data
   // --------------------------------------------------
+const episodeData =
+  await p.anime.getEpisode(
+    animeId,
+    episodeNumber
+  );
 
-  const episodeData =
-    await p.anime.getEpisode(
-
-      console.log(
+console.log(
   '[RAW EPISODE]',
   JSON.stringify(
     episodeData,
@@ -139,19 +141,6 @@ app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
     2
   )
 );
-      
-      animeId,
-      episodeNumber
-    );
-
-  console.log(
-    '[EPISODE DATA]',
-    JSON.stringify(
-      episodeData,
-      null,
-      2
-    )
-  );
 
   // --------------------------------------------------
   // Allowed filters
