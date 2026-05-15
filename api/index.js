@@ -202,232 +202,78 @@ console.log(
   // Allowed filters
   // --------------------------------------------------
 
-  const allowedQualities = [
-    '720',
-    '1080'
-  ];
+const subUrl =
+  episodeData?.episode
+    ?.sources
+    ?.sub
+  || null;
 
-  const allowedKeywords = [
-    'kiwi',
-    'kwik'
-  ];
+const dubUrl =
+  episodeData?.episode
+    ?.sources
+    ?.dub
+  || null;
 
-  // --------------------------------------------------
-  // Helper
-  // --------------------------------------------------
+// ----------------------------------
+// Extract real kwik
+// ----------------------------------
 
-  const filterServers = (servers = []) => {
+const subKwik =
+  subUrl
+    ? await extractKwikFromMegaPlay(subUrl)
+    : null;
 
-    if (!Array.isArray(servers)) {
-      return [];
-    }
+const dubKwik =
+  dubUrl
+    ? await extractKwikFromMegaPlay(dubUrl)
+    : null;
 
-    return servers.filter(server => {
+console.log(
+  '[KWIK SUB]',
+  subKwik
+);
 
-      const name =
-        (
-          server.serverName
-          || server.name
-          || ''
-        ).toLowerCase();
-
-      const isKwik =
-        allowedKeywords.some(keyword =>
-          name.includes(keyword)
-        );
-
-      const isCorrectQuality =
-        allowedQualities.some(quality =>
-          name.includes(quality)
-        );
-
-      return (
-        isKwik &&
-        isCorrectQuality
-      );
-    });
-  };
-
-  // --------------------------------------------------
-  // Detect structures
-  // --------------------------------------------------
-
-  let subServers = [];
-  let dubServers = [];
-
-  if (episodeData?.sub) {
-
-    subServers =
-      filterServers(
-        episodeData.sub
-      );
-  }
-
-  if (episodeData?.dub) {
-
-    dubServers =
-      filterServers(
-        episodeData.dub
-      );
-  }
-
-  if (
-    subServers.length === 0 &&
-    Array.isArray(episodeData?.sources)
-  ) {
-
-    subServers =
-      filterServers(
-        episodeData.sources
-      );
-  }
-
-  // --------------------------------------------------
-  // Extract actual iframe URLs
-  // --------------------------------------------------
-
-  const normalizeServers = async (
-    servers = []
-  ) => {
-
-    const results = [];
-
-    for (const server of servers) {
-
-      let iframe = null;
-
-      // direct
-      iframe =
-        server.url
-        || server.file
-        || server.embed
-        || null;
-
-      // serverId extraction
-      if (
-        !iframe &&
-        server.serverId &&
-        typeof p.anime.getEpisodeSources === 'function'
-      ) {
-
-        try {
-
-          const sourceData =
-            await p.anime.getEpisodeSources(
-              server.serverId
-            );
-
-          iframe =
-            sourceData?.embed
-            || sourceData?.sources?.[0]?.file
-            || sourceData?.sources?.[0]?.url
-            || null;
-
-        } catch (e) {
-
-          console.error(
-            '[SOURCE EXTRACTION ERROR]',
-            e
-          );
-        }
-      }
-
-      results.push({
-
-        serverName:
-          server.serverName
-          || server.name
-          || 'Unknown',
-
-        quality:
-          (
-            server.serverName
-            || ''
-          ).includes('1080')
-            ? '1080p'
-            : '720p',
-
-        iframe,
-
-        raw: server
-      });
-    }
-
-    return results.filter(s => s.iframe);
-  };
-
-  // --------------------------------------------------
-  // Normalize
-  // --------------------------------------------------
-
-  const normalizedSub =
-    await normalizeServers(
-      subServers
-    );
-
-  const normalizedDub =
-    await normalizeServers(
-      dubServers
-    );
-
-  // --------------------------------------------------
-  // Auto iframe
-  // --------------------------------------------------
-
-  let iframe = null;
-
-  if (normalizedSub.length > 0) {
-
-    iframe =
-      normalizedSub[0].iframe;
-
-  } else if (normalizedDub.length > 0) {
-
-    iframe =
-      normalizedDub[0].iframe;
-  }
-
+console.log(
+  '[KWIK DUB]',
+  dubKwik
+);
   // --------------------------------------------------
   // Final response
   // --------------------------------------------------
 
    return {
 
-    animeId,
+  animeId,
 
-    episode:
-      episodeNumber,
+  episode:
+    episodeNumber,
 
-    iframe,
+  iframe:
+    subKwik
+    || dubKwik
+    || null,
 
-    preferredServers: {
+  preferredServers: {
 
-      sub: normalizedSub,
+    sub: subKwik
+      ? [
+          {
+            quality: 'SUB',
+            url: subKwik
+          }
+        ]
+      : [],
 
-      dub: normalizedDub
-    },
-
-    tracks:
-      episodeData?.tracks
-      || [],
-
-    intro:
-      episodeData?.intro
-      || null,
-
-    outro:
-      episodeData?.outro
-      || null
-  };
-
-    });
-
-  } catch (e) {
-
-    return err(c, e.message);
+    dub: dubKwik
+      ? [
+          {
+            quality: 'DUB',
+            url: dubKwik
+          }
+        ]
+      : []
   }
-});
-
+};
 // ─── Search ───────────────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/search', async (c) => {
   try {
