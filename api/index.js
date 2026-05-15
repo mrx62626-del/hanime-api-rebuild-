@@ -108,12 +108,204 @@ app.get('/api/v2/:provider/anime/:animeId/episodes', async (c) => {
 
 // ─── Single episode ───────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/anime/:animeId/ep/:number', async (c) => {
+
   try {
-    const p = await getProvider(c.req.param('provider'));
-    return withCache(c, TTL.EPISODE, () =>
-      p.anime.getEpisode(c.req.param('animeId'), c.req.param('number'))
-    );
+
+    const p =
+      await getProvider(
+        c.req.param('provider')
+      );
+
+    return withCache(c, TTL.EPISODE, async () => {
+
+      const episodeData =
+        await p.anime.getEpisode(
+          c.req.param('animeId'),
+          c.req.param('number')
+        );
+
+      // --------------------------------------------------
+      // Allowed filters
+      // --------------------------------------------------
+
+      const allowedQualities = [
+        '720',
+        '1080'
+      ];
+
+      const allowedKeywords = [
+        'kiwi',
+        'kwik'
+      ];
+
+      // --------------------------------------------------
+      // Filter helper
+      // --------------------------------------------------
+
+      const filterServers = (servers = []) => {
+
+        if (!Array.isArray(servers)) {
+          return [];
+        }
+
+        return servers
+          .filter(server => {
+
+            const name =
+              (
+                server.serverName
+                || server.name
+                || ''
+              ).toLowerCase();
+
+            const isKwik =
+              allowedKeywords.some(keyword =>
+                name.includes(keyword)
+              );
+
+            const isCorrectQuality =
+              allowedQualities.some(quality =>
+                name.includes(quality)
+              );
+
+            return (
+              isKwik &&
+              isCorrectQuality
+            );
+          })
+          .map(server => ({
+
+            serverName:
+              server.serverName
+              || server.name
+              || 'Unknown',
+
+            url:
+              server.url
+              || server.file
+              || server.embed
+              || null,
+
+            type:
+              server.type
+              || 'embed'
+          }))
+          .filter(server => server.url);
+      };
+
+      // --------------------------------------------------
+      // Detect structures
+      // --------------------------------------------------
+
+      let subServers = [];
+      let dubServers = [];
+
+      // Structure 1
+      if (episodeData?.sub) {
+
+        subServers =
+          filterServers(
+            episodeData.sub
+          );
+      }
+
+      if (episodeData?.dub) {
+
+        dubServers =
+          filterServers(
+            episodeData.dub
+          );
+      }
+
+      // Structure 2
+      if (
+        subServers.length === 0 &&
+        episodeData?.sources?.sub
+      ) {
+
+        subServers =
+          filterServers(
+            episodeData.sources.sub
+          );
+      }
+
+      if (
+        dubServers.length === 0 &&
+        episodeData?.sources?.dub
+      ) {
+
+        dubServers =
+          filterServers(
+            episodeData.sources.dub
+          );
+      }
+
+      // Structure 3
+      if (
+        subServers.length === 0 &&
+        Array.isArray(episodeData?.sources)
+      ) {
+
+        subServers =
+          filterServers(
+            episodeData.sources
+          );
+      }
+
+      // --------------------------------------------------
+      // Auto iframe
+      // --------------------------------------------------
+
+      let iframe = null;
+
+      if (subServers.length > 0) {
+
+        iframe =
+          subServers[0].url;
+
+      } else if (dubServers.length > 0) {
+
+        iframe =
+          dubServers[0].url;
+      }
+
+      // --------------------------------------------------
+      // Final clean response
+      // --------------------------------------------------
+
+      return {
+
+        animeId:
+          c.req.param('animeId'),
+
+        episode:
+          c.req.param('number'),
+
+        iframe,
+
+        preferredServers: {
+
+          sub: subServers,
+
+          dub: dubServers
+        },
+
+        tracks:
+          episodeData?.tracks
+          || [],
+
+        intro:
+          episodeData?.intro
+          || null,
+
+        outro:
+          episodeData?.outro
+          || null
+      };
+    });
+
   } catch (e) {
+
     return err(c, e.message);
   }
 });
