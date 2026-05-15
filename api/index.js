@@ -4,8 +4,61 @@ import { handle } from '@hono/node-server/vercel';
 import { getProvider, getProviderWithFallback } from '../core/providerManager.js';
 import { withCache, TTL, cacheStats } from '../utils/cache.js';
 import { serve } from '@hono/node-server';
+import * as cheerio from 'cheerio';
 
 const app = new Hono();
+
+const app = new Hono();
+
+async function extractKwikFromMegaPlay(url) {
+
+  try {
+
+    const response =
+      await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0'
+        }
+      });
+
+    const html =
+      await response.text();
+
+    const $ =
+      cheerio.load(html);
+
+    let iframe = null;
+
+    $('iframe').each((i, el) => {
+
+      const src =
+        $(el).attr('src');
+
+      if (
+        src &&
+        (
+          src.includes('kwik')
+          || src.includes('kiwi')
+        )
+      ) {
+
+        iframe = src;
+      }
+    });
+
+    return iframe;
+
+  } catch (e) {
+
+    console.error(
+      '[KWIK EXTRACT ERROR]',
+      e
+    );
+
+    return null;
+  }
+}
 
 // ─── Root ────────────────────────────────────────────────────────────────────
 app.get('/', (c) => c.json({
