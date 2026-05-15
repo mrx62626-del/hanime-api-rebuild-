@@ -134,7 +134,12 @@ const episodeData =
   );
 
 console.log(
-  '[RAW EPISODE]',
+  '[EPISODE KEYS]',
+  Object.keys(episodeData || {})
+);
+
+console.log(
+  '[FULL RAW]',
   JSON.stringify(
     episodeData,
     null,
