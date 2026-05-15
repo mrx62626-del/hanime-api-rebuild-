@@ -5,69 +5,69 @@ import { getProvider, getProviderWithFallback } from '../core/providerManager.js
 import { withCache, TTL, cacheStats } from '../utils/cache.js';
 import { serve } from '@hono/node-server';
 import * as cheerio from 'cheerio';
+import { chromium } from 'playwright';
 
 const app = new Hono();
 
 async function extractKwikFromMegaPlay(url) {
 
+  let browser;
+
   try {
 
-    const response =
-      await fetch(url, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0',
-          'Referer':
-            'https://anikoto.to/'
-        }
+    browser =
+      await chromium.launch({
+        headless: true
       });
 
-    const html =
-      await response.text();
+    const page =
+      await browser.newPage();
 
-    // ----------------------------------
-    // Regex extraction
-    // ----------------------------------
-
-    const kwikMatch =
-      html.match(
-        /https?:\/\/kwik\.cx\/e\/[^"' ]+/i
-      );
-
-    if (kwikMatch) {
-
-      return kwikMatch[0];
-    }
-
-    // ----------------------------------
-    // Fallback iframe parse
-    // ----------------------------------
-
-    const $ =
-      cheerio.load(html);
-
-    let iframe = null;
-
-    $('iframe').each((i, el) => {
-
-      const src =
-        $(el).attr('src');
-
-      if (
-        src &&
-        src.includes('kwik.cx')
-      ) {
-
-        iframe = src;
-      }
+    await page.goto(url, {
+      waitUntil: 'networkidle',
+      timeout: 60000
     });
+
+    // wait a little extra
+    await page.waitForTimeout(3000);
+
+    // find iframe
+    const iframe =
+      await page.evaluate(() => {
+
+        const iframes =
+          Array.from(
+            document.querySelectorAll('iframe')
+          );
+
+        for (const iframe of iframes) {
+
+          const src =
+            iframe.src || '';
+
+          if (
+            src.includes('kwik.cx')
+          ) {
+
+            return src;
+          }
+        }
+
+        return null;
+      });
+
+    await browser.close();
 
     return iframe;
 
   } catch (e) {
 
+    if (browser) {
+      await browser.close();
+    }
+
     console.error(
-      '[KWIK EXTRACT ERROR]',
+      '[PLAYWRIGHT KWIK ERROR]',
       e
     );
 
