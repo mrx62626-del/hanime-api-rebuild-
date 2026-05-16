@@ -78,6 +78,7 @@ app.get('/api/v2/:provider/home', async (c) => {
 });
 
 // ─── Search ───────────────────────────────────────────────────────────────
+// ─── Search ───────────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/search', async (c) => {
 
   try {
@@ -121,82 +122,87 @@ app.get('/api/v2/:provider/search', async (c) => {
         await response.text();
 
       const $ =
-  cheerio.load(html);
+        cheerio.load(html);
 
-const results = [];
+      const results = [];
 
-// ---------------------------------
-// Parse anime cards
-// ---------------------------------
+      // ---------------------------------
+      // Parse anime cards
+      // ---------------------------------
 
-$('.film_list-wrap .flw-item').each((i, el) => {
+      $('.film_list-wrap .flw-item').each((i, el) => {
 
-  const title =
-    $(el)
-    .find('.film-name')
-    .text()
-    .trim();
+        const title =
+          $(el)
+          .find('.film-name')
+          .text()
+          .trim();
 
-  const poster =
-    $(el)
-    .find('img')
-    .attr('data-src')
-    ||
-    $(el)
-    .find('img')
-    .attr('src')
-    ||
-    '';
+        const poster =
+          $(el)
+          .find('img')
+          .attr('data-src')
+          ||
+          $(el)
+          .find('img')
+          .attr('src')
+          ||
+          '';
 
-  const href =
-    $(el)
-    .find('.film-poster-ahref')
-    .attr('href')
-    ||
-    '';
+        const href =
+          $(el)
+          .find('.film-poster-ahref')
+          .attr('href')
+          ||
+          '';
 
-  const id =
-    href
-    .replace('/details/', '')
-    .replace(/\//g, '');
+        const id =
+          href
+          .replace('/details/', '')
+          .replace(/\//g, '');
 
-  const sub =
-    $(el)
-    .find('.tick-sub')
-    .text()
-    .trim();
+        const sub =
+          $(el)
+          .find('.tick-sub')
+          .text()
+          .trim();
 
-  const dub =
-    $(el)
-    .find('.tick-dub')
-    .text()
-    .trim();
+        const dub =
+          $(el)
+          .find('.tick-dub')
+          .text()
+          .trim();
 
-  results.push({
+        results.push({
 
-    id,
+          id,
 
-    title,
+          title,
 
-    poster,
+          poster,
 
-    episodes: {
+          episodes: {
 
-      sub:
-        sub || null,
+            sub:
+              sub || null,
 
-      dub:
-        dub || null
+            dub:
+              dub || null
+          }
+        });
+      });
+
+      return c.json({
+
+        success: true,
+
+        data: results
+      });
     }
-  });
-});
 
-return c.json({
-
-  success: true,
-
-  data: results
-});
+    // ---------------------------------
+    // Unsupported provider
+    // ---------------------------------
 
     return c.json({
 
