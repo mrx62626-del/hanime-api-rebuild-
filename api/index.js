@@ -139,12 +139,25 @@ console.log(
 // Parse anime cards
 // ---------------------------------
 
-$('.flw-item').each((i, el) => {
+$('.film_list-wrap .film-poster').each((i, el) => {
+
+  const $ =
+  cheerio.load(html);
+
+const results = [];
+
+// DEBUG
+console.log(
+  'POSTERS:',
+  $('.film-poster').length
+);
+
+$('.film-poster').each((i, el) => {
 
   const title =
     $(el)
+    .parent()
     .find('.film-name')
-    .first()
     .text()
     .trim();
 
@@ -162,7 +175,6 @@ $('.flw-item').each((i, el) => {
   const href =
     $(el)
     .find('a')
-    .first()
     .attr('href')
     ||
     '';
@@ -176,12 +188,14 @@ $('.flw-item').each((i, el) => {
 
   const sub =
     $(el)
+    .parent()
     .find('.tick-sub')
     .text()
     .replace(/\D/g, '');
 
   const dub =
     $(el)
+    .parent()
     .find('.tick-dub')
     .text()
     .replace(/\D/g, '');
@@ -216,7 +230,7 @@ return c.json({
 
   data: results
 });
-    }
+}
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
