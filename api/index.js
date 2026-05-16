@@ -76,6 +76,64 @@ app.get('/api/v2/:provider/home', async (c) => {
   }
 });
 
+// ─── Search ───────────────────────────────────────────────────────────────
+app.get('/api/v2/:provider/search', async (c) => {
+
+  try {
+
+    const providerName =
+      c.req.param('provider');
+
+    const query =
+      c.req.query('q');
+
+    if (!query) {
+
+      return c.json({
+
+        success: false,
+
+        message:
+          'Missing search query'
+
+      }, 400);
+    }
+
+    const p =
+      await getProvider(
+        providerName
+      );
+
+    const results =
+      await p.search(
+        query
+      );
+
+    return c.json({
+
+      success: true,
+
+      data:
+        results
+    });
+
+  } catch (e) {
+
+    console.error(
+      '[SEARCH ERROR]',
+      e
+    );
+
+    return c.json({
+
+      success: false,
+
+      message:
+        e.message
+    }, 500);
+  }
+});
+
 // ─── Index / landing page ─────────────────────────────────────────────────────
 app.get('/api/v2/:provider/index', async (c) => {
   try {
