@@ -121,6 +121,8 @@ app.get('/api/v2/:provider/search', async (c) => {
       const html =
         await response.text();
 
+      console.log(html);
+
       const $ =
         cheerio.load(html);
 
