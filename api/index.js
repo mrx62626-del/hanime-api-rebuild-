@@ -132,11 +132,11 @@ app.get('/api/v2/:provider/search', async (c) => {
       // Parse anime cards
       // ---------------------------------
 
-      $('.film_list-wrap .flw-item').each((i, el) => {
+      $('.flw-item').each((i, el) => {
 
         const title =
           $(el)
-          .find('.film-name')
+          .find('.film-name a')
           .text()
           .trim();
 
@@ -160,6 +160,8 @@ app.get('/api/v2/:provider/search', async (c) => {
 
         const id =
           href
+          .replace('/watch/', '')
+          .replace('/anime/', '')
           .replace('/details/', '')
           .replace(/\//g, '');
 
