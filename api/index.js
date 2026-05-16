@@ -121,6 +121,8 @@ app.get('/api/v2/:provider/search', async (c) => {
       const html =
         await response.text();
 
+      console.log(html.slice(0, 3000));
+
       console.log(html);
 
       const $ =
