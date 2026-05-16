@@ -149,47 +149,60 @@ app.get('/api/v2/:provider/search', async (c) => {
       // Parse anime cards
       // ---------------------------------
 
-      $('.flw-item').each((i, el) => {
-
-  const title =
-    $(el)
-    .find('.film-name')
-    .text()
-    .trim();
-
-  const poster =
-    $(el)
-    .find('img')
-    .attr('data-src')
-    ||
-    $(el)
-    .find('img')
-    .attr('src')
-    ||
-    '';
+$('a').each((i, el) => {
 
   const href =
-    $(el)
-    .find('a')
-    .attr('href')
-    ||
-    '';
+    $(el).attr('href') || '';
 
-  const id =
-    href
-      .split('/')
-      .filter(Boolean)
-      .pop()
-    || '';
+  // Match anime URLs only
+  if (
+    href.includes('/anime/')
+  ) {
 
-  results.push({
+    const title =
+      $(el)
+      .attr('title')
+      ||
+      $(el)
+      .text()
+      .trim();
 
-    id,
+    const img =
+      $(el)
+      .find('img');
 
-    title,
+    const poster =
+      img.attr('data-src')
+      ||
+      img.attr('src')
+      ||
+      '';
 
-    poster
-  });
+    const id =
+      href
+        .split('/anime/')
+        .pop()
+        ?.replace(/\//g, '')
+      || '';
+
+    // Avoid duplicates
+    if (
+      id &&
+      !results.some(
+        a => a.id === id
+      )
+    ) {
+
+      results.push({
+
+        id,
+
+        title,
+
+        poster
+      });
+    }
+  }
 });
 
 return c.json({
