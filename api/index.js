@@ -105,7 +105,7 @@ app.get('/api/v2/:provider/search', async (c) => {
       );
 
     const results =
-      await p.search(
+      await p.anime.search(
         query
       );
 
