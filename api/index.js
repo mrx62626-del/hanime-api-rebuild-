@@ -129,43 +129,50 @@ app.get('/api/v2/:provider/search', async (c) => {
 
 const results = [];
 
+// DEBUG
+console.log(
+  'FLW ITEMS:',
+  $('.flw-item').length
+);
+
 // ---------------------------------
 // Parse anime cards
 // ---------------------------------
 
-$('.film_list-wrap .flw-item').each((i, el) => {
+$('.flw-item').each((i, el) => {
 
   const title =
     $(el)
     .find('.film-name')
+    .first()
     .text()
     .trim();
 
   const poster =
     $(el)
-    .find('.film-poster-img')
+    .find('img')
     .attr('data-src')
     ||
     $(el)
-    .find('.film-poster-img')
+    .find('img')
     .attr('src')
     ||
     '';
 
   const href =
     $(el)
-    .find('.film-poster-ahref')
+    .find('a')
+    .first()
     .attr('href')
     ||
     '';
 
   const id =
     href
-    .split('/anime/')
-    .pop()
-    ?.replace(/\//g, '')
-    ||
-    '';
+      .split('/')
+      .filter(Boolean)
+      .pop()
+    || '';
 
   const sub =
     $(el)
@@ -179,13 +186,6 @@ $('.film_list-wrap .flw-item').each((i, el) => {
     .text()
     .replace(/\D/g, '');
 
-  const type =
-    $(el)
-    .find('.fd-infor .fdi-item')
-    .last()
-    .text()
-    .trim();
-
   results.push({
 
     id,
@@ -193,8 +193,6 @@ $('.film_list-wrap .flw-item').each((i, el) => {
     title,
 
     poster,
-
-    type,
 
     episodes: {
 
