@@ -78,7 +78,6 @@ app.get('/api/v2/:provider/home', async (c) => {
 });
 
 // ─── Search ───────────────────────────────────────────────────────────────
-// ─── Search ───────────────────────────────────────────────────────────────
 app.get('/api/v2/:provider/search', async (c) => {
 
   try {
@@ -126,86 +125,99 @@ app.get('/api/v2/:provider/search', async (c) => {
       console.log(html);
 
       const $ =
-        cheerio.load(html);
+  cheerio.load(html);
 
-      const results = [];
+const results = [];
 
-      // ---------------------------------
-      // Parse anime cards
-      // ---------------------------------
+// ---------------------------------
+// Parse anime cards
+// ---------------------------------
 
-      $('.flw-item').each((i, el) => {
+$('.film_list-wrap .flw-item').each((i, el) => {
 
-        const title =
-          $(el)
-          .find('.film-name a')
-          .text()
-          .trim();
+  const title =
+    $(el)
+    .find('.film-name')
+    .text()
+    .trim();
 
-        const poster =
-          $(el)
-          .find('img')
-          .attr('data-src')
-          ||
-          $(el)
-          .find('img')
-          .attr('src')
-          ||
-          '';
+  const poster =
+    $(el)
+    .find('.film-poster-img')
+    .attr('data-src')
+    ||
+    $(el)
+    .find('.film-poster-img')
+    .attr('src')
+    ||
+    '';
 
-        const href =
-          $(el)
-          .find('.film-poster-ahref')
-          .attr('href')
-          ||
-          '';
+  const href =
+    $(el)
+    .find('.film-poster-ahref')
+    .attr('href')
+    ||
+    '';
 
-        const id =
-          href
-          .replace('/watch/', '')
-          .replace('/anime/', '')
-          .replace('/details/', '')
-          .replace(/\//g, '');
+  const id =
+    href
+    .split('/anime/')
+    .pop()
+    ?.replace(/\//g, '')
+    ||
+    '';
 
-        const sub =
-          $(el)
-          .find('.tick-sub')
-          .text()
-          .trim();
+  const sub =
+    $(el)
+    .find('.tick-sub')
+    .text()
+    .replace(/\D/g, '');
 
-        const dub =
-          $(el)
-          .find('.tick-dub')
-          .text()
-          .trim();
+  const dub =
+    $(el)
+    .find('.tick-dub')
+    .text()
+    .replace(/\D/g, '');
 
-        results.push({
+  const type =
+    $(el)
+    .find('.fd-infor .fdi-item')
+    .last()
+    .text()
+    .trim();
 
-          id,
+  results.push({
 
-          title,
+    id,
 
-          poster,
+    title,
 
-          episodes: {
+    poster,
 
-            sub:
-              sub || null,
+    type,
 
-            dub:
-              dub || null
-          }
-        });
-      });
+    episodes: {
 
-      return c.json({
+      sub:
+        sub || null,
 
-        success: true,
-
-        data: results
-      });
+      dub:
+        dub || null
     }
+  });
+});
 
+console.log(
+  '[SEARCH RESULTS]',
+  results.length
+);
+
+return c.json({
+
+  success: true,
+
+  data: results
+});
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
