@@ -101,7 +101,7 @@ app.get('/api/v2/:provider/search', async (c) => {
     }
 
     // ---------------------------------
-    // Anikoto custom search
+    // Anikoto search
     // ---------------------------------
 
     if (providerName === 'anikoto') {
@@ -120,116 +120,100 @@ app.get('/api/v2/:provider/search', async (c) => {
       const html =
         await response.text();
 
-      console.log(html.slice(0, 3000));
-
-      console.log(html);
-
       const $ =
-  cheerio.load(html);
+        cheerio.load(html);
 
-const results = [];
+      const results = [];
 
-// DEBUG
-console.log(
-  'FLW ITEMS:',
-  $('.flw-item').length
-);
+      console.log(
+        'POSTERS:',
+        $('.film-poster').length
+      );
 
-// ---------------------------------
-// Parse anime cards
-// ---------------------------------
+      // ---------------------------------
+      // Parse anime cards
+      // ---------------------------------
 
-$('.film_list-wrap .film-poster').each((i, el) => {
+      $('.film-poster').each((i, el) => {
 
-  const $ =
-  cheerio.load(html);
+        const title =
+          $(el)
+          .parent()
+          .find('.film-name')
+          .text()
+          .trim();
 
-const results = [];
+        const poster =
+          $(el)
+          .find('img')
+          .attr('data-src')
+          ||
+          $(el)
+          .find('img')
+          .attr('src')
+          ||
+          '';
 
-// DEBUG
-console.log(
-  'POSTERS:',
-  $('.film-poster').length
-);
+        const href =
+          $(el)
+          .find('a')
+          .attr('href')
+          ||
+          '';
 
-$('.film-poster').each((i, el) => {
+        const id =
+          href
+            .split('/')
+            .filter(Boolean)
+            .pop()
+          || '';
 
-  const title =
-    $(el)
-    .parent()
-    .find('.film-name')
-    .text()
-    .trim();
+        const sub =
+          $(el)
+          .parent()
+          .find('.tick-sub')
+          .text()
+          .replace(/\D/g, '');
 
-  const poster =
-    $(el)
-    .find('img')
-    .attr('data-src')
-    ||
-    $(el)
-    .find('img')
-    .attr('src')
-    ||
-    '';
+        const dub =
+          $(el)
+          .parent()
+          .find('.tick-dub')
+          .text()
+          .replace(/\D/g, '');
 
-  const href =
-    $(el)
-    .find('a')
-    .attr('href')
-    ||
-    '';
+        results.push({
 
-  const id =
-    href
-      .split('/')
-      .filter(Boolean)
-      .pop()
-    || '';
+          id,
 
-  const sub =
-    $(el)
-    .parent()
-    .find('.tick-sub')
-    .text()
-    .replace(/\D/g, '');
+          title,
 
-  const dub =
-    $(el)
-    .parent()
-    .find('.tick-dub')
-    .text()
-    .replace(/\D/g, '');
+          poster,
 
-  results.push({
+          episodes: {
 
-    id,
+            sub:
+              sub || null,
 
-    title,
+            dub:
+              dub || null
+          }
+        });
+      });
 
-    poster,
+      console.log(
+        '[SEARCH RESULTS]',
+        results.length
+      );
 
-    episodes: {
+      return c.json({
 
-      sub:
-        sub || null,
+        success: true,
 
-      dub:
-        dub || null
+        data: results
+      });
     }
-  });
-});
 
-console.log(
-  '[SEARCH RESULTS]',
-  results.length
-);
-
-return c.json({
-
-  success: true,
-
-  data: results
-});
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
@@ -260,6 +244,7 @@ return c.json({
     }, 500);
   }
 });
+
 // ─── Index / landing page ─────────────────────────────────────────────────────
 app.get('/api/v2/:provider/index', async (c) => {
   try {
