@@ -4,6 +4,7 @@ import { handle } from '@hono/node-server/vercel';
 import { getProvider, getProviderWithFallback } from '../core/providerManager.js';
 import { withCache, TTL, cacheStats } from '../utils/cache.js';
 import { serve } from '@hono/node-server';
+import * as cheerio from 'cheerio';
 
 const app = new Hono();
 
@@ -119,14 +120,83 @@ app.get('/api/v2/:provider/search', async (c) => {
       const html =
         await response.text();
 
-      return c.json({
+      const $ =
+  cheerio.load(html);
 
-        success: true,
+const results = [];
 
-        html
+// ---------------------------------
+// Parse anime cards
+// ---------------------------------
 
-      });
+$('.film_list-wrap .flw-item').each((i, el) => {
+
+  const title =
+    $(el)
+    .find('.film-name')
+    .text()
+    .trim();
+
+  const poster =
+    $(el)
+    .find('img')
+    .attr('data-src')
+    ||
+    $(el)
+    .find('img')
+    .attr('src')
+    ||
+    '';
+
+  const href =
+    $(el)
+    .find('.film-poster-ahref')
+    .attr('href')
+    ||
+    '';
+
+  const id =
+    href
+    .replace('/details/', '')
+    .replace(/\//g, '');
+
+  const sub =
+    $(el)
+    .find('.tick-sub')
+    .text()
+    .trim();
+
+  const dub =
+    $(el)
+    .find('.tick-dub')
+    .text()
+    .trim();
+
+  results.push({
+
+    id,
+
+    title,
+
+    poster,
+
+    episodes: {
+
+      sub:
+        sub || null,
+
+      dub:
+        dub || null
     }
+  });
+});
+
+return c.json({
+
+  success: true,
+
+  data: results
+});
 
     return c.json({
 
