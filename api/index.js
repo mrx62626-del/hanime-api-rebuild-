@@ -111,9 +111,29 @@ app.get('/api/v2/:provider/search', async (c) => {
 
       const response =
         await fetch(url, {
+      
           headers: {
+      
             'User-Agent':
-              'Mozilla/5.0'
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+      
+            'Accept':
+              'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      
+            'Accept-Language':
+              'en-US,en;q=0.9',
+      
+            'Referer':
+              'https://anikoto.cz/',
+      
+            'Origin':
+              'https://anikoto.cz',
+      
+            'Cache-Control':
+              'no-cache',
+      
+            'Pragma':
+              'no-cache'
           }
         });
 
@@ -125,95 +145,59 @@ app.get('/api/v2/:provider/search', async (c) => {
 
       const results = [];
 
-      console.log(
-        'POSTERS:',
-        $('.film-poster').length
-      );
-
       // ---------------------------------
       // Parse anime cards
       // ---------------------------------
 
-      $('.film-poster').each((i, el) => {
+      $('.flw-item').each((i, el) => {
 
-        const title =
-          $(el)
-          .parent()
-          .find('.film-name')
-          .text()
-          .trim();
+  const title =
+    $(el)
+    .find('.film-name')
+    .text()
+    .trim();
 
-        const poster =
-          $(el)
-          .find('img')
-          .attr('data-src')
-          ||
-          $(el)
-          .find('img')
-          .attr('src')
-          ||
-          '';
+  const poster =
+    $(el)
+    .find('img')
+    .attr('data-src')
+    ||
+    $(el)
+    .find('img')
+    .attr('src')
+    ||
+    '';
 
-        const href =
-          $(el)
-          .find('a')
-          .attr('href')
-          ||
-          '';
+  const href =
+    $(el)
+    .find('a')
+    .attr('href')
+    ||
+    '';
 
-        const id =
-          href
-            .split('/')
-            .filter(Boolean)
-            .pop()
-          || '';
+  const id =
+    href
+      .split('/')
+      .filter(Boolean)
+      .pop()
+    || '';
 
-        const sub =
-          $(el)
-          .parent()
-          .find('.tick-sub')
-          .text()
-          .replace(/\D/g, '');
+  results.push({
 
-        const dub =
-          $(el)
-          .parent()
-          .find('.tick-dub')
-          .text()
-          .replace(/\D/g, '');
+    id,
 
-        results.push({
+    title,
 
-          id,
+    poster
+  });
+});
 
-          title,
+return c.json({
 
-          poster,
+  success: true,
 
-          episodes: {
-
-            sub:
-              sub || null,
-
-            dub:
-              dub || null
-          }
-        });
-      });
-
-      console.log(
-        '[SEARCH RESULTS]',
-        results.length
-      );
-
-      return c.json({
-
-        success: true,
-
-        data: results
-      });
-    }
-
+  data: results
+});
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
