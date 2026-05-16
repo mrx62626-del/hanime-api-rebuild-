@@ -99,23 +99,43 @@ app.get('/api/v2/:provider/search', async (c) => {
       }, 400);
     }
 
-    const p =
-      await getProvider(
-        providerName
-      );
+    // ---------------------------------
+    // Anikoto custom search
+    // ---------------------------------
 
-    const results =
-      await p.anime.search(
-        query
-      );
+    if (providerName === 'anikoto') {
+
+      const url =
+        `https://anikoto.cz/filter?keyword=${encodeURIComponent(query)}`;
+
+      const response =
+        await fetch(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0'
+          }
+        });
+
+      const html =
+        await response.text();
+
+      return c.json({
+
+        success: true,
+
+        html
+
+      });
+    }
 
     return c.json({
 
-      success: true,
+      success: false,
 
-      data:
-        results
-    });
+      message:
+        'Provider search unsupported'
+
+    }, 400);
 
   } catch (e) {
 
@@ -130,10 +150,10 @@ app.get('/api/v2/:provider/search', async (c) => {
 
       message:
         e.message
+
     }, 500);
   }
 });
-
 // ─── Index / landing page ─────────────────────────────────────────────────────
 app.get('/api/v2/:provider/index', async (c) => {
   try {
