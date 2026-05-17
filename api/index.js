@@ -173,11 +173,17 @@ if (providerName === 'anikoto') {
 
 const results = [];
 
+console.log(
+  'ITEMS:',
+  $('.item').length
+);
+
+
 // ---------------------------------
 // Parse anime cards
 // ---------------------------------
 
-$('#list-items .item').each((i, el) => {
+$('.item').each((i, el) => {
 
   const link =
     $(el)
