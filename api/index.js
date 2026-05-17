@@ -171,76 +171,94 @@ if (providerName === 'anikoto') {
     $('.film-poster').length
   );
 
-  const results = [];
+const results = [];
 
 // ---------------------------------
-// Parse ALL anime links
+// Parse anime cards
 // ---------------------------------
 
-$('a').each((i, el) => {
+$('#list-items .item').each((i, el) => {
+
+  const link =
+    $(el)
+      .find('.ani_poster a');
 
   const href =
-    $(el).attr('href') || '';
+    link.attr('href') || '';
 
-  // Only anime pages
+  const id =
+    href
+      .split('/watch/')
+      .pop()
+      ?.replace(/\//g, '')
+    || '';
+
+  const title =
+    $(el)
+      .find('.ani_detail .ani_name')
+      .text()
+      .trim()
+
+    ||
+
+    link.attr('title')
+
+    ||
+
+    'Unknown';
+
+  const poster =
+    $(el)
+      .find('img')
+      .attr('src')
+
+    ||
+
+    $(el)
+      .find('img')
+      .attr('data-src')
+
+    ||
+
+    '';
+
+  const sub =
+    $(el)
+      .find('.sub')
+      .text()
+      .replace(/\D/g, '');
+
+  const dub =
+    $(el)
+      .find('.dub')
+      .text()
+      .replace(/\D/g, '');
+
+  // Avoid duplicates
   if (
-    href.startsWith('/anime/')
+    id &&
+    !results.some(
+      anime => anime.id === id
+    )
   ) {
 
-    const id =
-      href
-        .replace('/anime/', '')
-        .replace(/\//g, '');
+    results.push({
 
-    // Find nearest image
-    const img =
-      $(el).find('img');
+      id,
 
-    const poster =
-      img.attr('data-src')
-      ||
-      img.attr('src')
-      ||
-      '';
+      title,
 
-    // Title
-    let title =
-      $(el).attr('title')
-      ||
-      $(el).text().trim();
+      poster,
 
-    // Fallback title from h3
-    if (!title) {
+      episodes: {
 
-      title =
-        $(el)
-          .find('h3')
-          .text()
-          .trim();
-    }
+        sub:
+          sub || null,
 
-    // Final fallback
-    if (!title) {
-      title = 'Unknown';
-    }
-
-    // Avoid duplicates
-    if (
-      id &&
-      !results.some(
-        anime => anime.id === id
-      )
-    ) {
-
-      results.push({
-
-        id,
-
-        title,
-
-        poster
-      });
-    }
+        dub:
+          dub || null
+      }
+    });
   }
 });
 
@@ -259,6 +277,7 @@ return c.json({
   data: results
 });
 }
+    
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
