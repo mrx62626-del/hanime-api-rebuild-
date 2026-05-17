@@ -263,6 +263,16 @@ $('#list-items .item').each((i, el) => {
     });
   }
 });
+
+  return c.json({
+
+  success: true,
+
+  total:
+    results.length,
+
+  data: results
+});
 }
     
     // ---------------------------------
