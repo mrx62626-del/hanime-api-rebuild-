@@ -126,12 +126,13 @@ app.get('/api/v2/:provider/search', async (c) => {
         });
 
       const html =
-        await response.text();
+  await response.text();
 
-      const $ =
-        cheerio.load(html);
+console.log(
+  html.slice(0, 15000)
+);
 
-      const results = [];
+return c.text(html);
 
       // ---------------------------------
       // Find anime links
