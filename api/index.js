@@ -173,79 +173,91 @@ if (providerName === 'anikoto') {
 
   const results = [];
 
-  // ---------------------------------
-  // Find anime links
-  // ---------------------------------
+// ---------------------------------
+// Parse ALL anime links
+// ---------------------------------
 
-  $('a').each((i, el) => {
+$('a').each((i, el) => {
 
-    const href =
-      $(el).attr('href') || '';
+  const href =
+    $(el).attr('href') || '';
 
-    // ONLY anime links
+  // Only anime pages
+  if (
+    href.startsWith('/anime/')
+  ) {
+
+    const id =
+      href
+        .replace('/anime/', '')
+        .replace(/\//g, '');
+
+    // Find nearest image
+    const img =
+      $(el).find('img');
+
+    const poster =
+      img.attr('data-src')
+      ||
+      img.attr('src')
+      ||
+      '';
+
+    // Title
+    let title =
+      $(el).attr('title')
+      ||
+      $(el).text().trim();
+
+    // Fallback title from h3
+    if (!title) {
+
+      title =
+        $(el)
+          .find('h3')
+          .text()
+          .trim();
+    }
+
+    // Final fallback
+    if (!title) {
+      title = 'Unknown';
+    }
+
+    // Avoid duplicates
     if (
-      href.includes('/anime/')
+      id &&
+      !results.some(
+        anime => anime.id === id
+      )
     ) {
 
-      const id =
-        href
-          .split('/anime/')
-          .pop()
-          ?.replace(/\//g, '')
-        || '';
+      results.push({
 
-      const title =
-        $(el).attr('title')
-        ||
-        $(el).text().trim()
-        ||
-        'Unknown';
+        id,
 
-      const poster =
-        $(el)
-          .find('img')
-          .attr('data-src')
-        ||
-        $(el)
-          .find('img')
-          .attr('src')
-        ||
-        '';
+        title,
 
-      // Avoid duplicates
-      if (
-        id &&
-        !results.some(
-          anime => anime.id === id
-        )
-      ) {
-
-        results.push({
-
-          id,
-
-          title,
-
-          poster
-        });
-      }
+        poster
+      });
     }
-  });
+  }
+});
 
-  console.log(
-    '[SEARCH RESULTS]',
-    results.length
-  );
+console.log(
+  '[SEARCH RESULTS]',
+  results.length
+);
 
-  return c.json({
+return c.json({
 
-    success: true,
+  success: true,
 
-    total:
-      results.length,
+  total:
+    results.length,
 
-    data: results
-  });
+  data: results
+});
 }
     // ---------------------------------
     // Unsupported provider
