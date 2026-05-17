@@ -100,99 +100,153 @@ app.get('/api/v2/:provider/search', async (c) => {
       }, 400);
     }
 
-    // ---------------------------------
-    // Anikoto Search
-    // ---------------------------------
+// ---------------------------------
+// Anikoto Search
+// ---------------------------------
 
-    if (providerName === 'anikoto') {
+if (providerName === 'anikoto') {
 
-      const url =
-        `https://anikoto.cz/filter?keyword=${encodeURIComponent(query)}`;
+  const url =
+    `https://anikoto.cz/filter?keyword=${encodeURIComponent(query)}`;
 
-      const response =
-        await fetch(url, {
+  const response =
+    await fetch(url, {
 
-          headers: {
+      headers: {
 
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
 
-            'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept':
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
 
-            'Referer':
-              'https://anikoto.cz/'
-          }
+        'Accept-Language':
+          'en-US,en;q=0.9',
+
+        'Referer':
+          'https://anikoto.cz/',
+
+        'Origin':
+          'https://anikoto.cz',
+
+        'Cache-Control':
+          'no-cache',
+
+        'Pragma':
+          'no-cache'
+      }
+    });
+
+  const html =
+    await response.text();
+
+  // ---------------------------------
+  // Debug logs
+  // ---------------------------------
+
+  console.log(
+    html.slice(0, 5000)
+  );
+
+  const $ =
+    cheerio.load(html);
+
+  console.log(
+    'A TAGS:',
+    $('a').length
+  );
+
+  console.log(
+    'IMG TAGS:',
+    $('img').length
+  );
+
+  console.log(
+    'FLW ITEMS:',
+    $('.flw-item').length
+  );
+
+  console.log(
+    'POSTERS:',
+    $('.film-poster').length
+  );
+
+  const results = [];
+
+  // ---------------------------------
+  // Find anime links
+  // ---------------------------------
+
+  $('a').each((i, el) => {
+
+    const href =
+      $(el).attr('href') || '';
+
+    // ONLY anime links
+    if (
+      href.includes('/anime/')
+    ) {
+
+      const id =
+        href
+          .split('/anime/')
+          .pop()
+          ?.replace(/\//g, '')
+        || '';
+
+      const title =
+        $(el).attr('title')
+        ||
+        $(el).text().trim()
+        ||
+        'Unknown';
+
+      const poster =
+        $(el)
+          .find('img')
+          .attr('data-src')
+        ||
+        $(el)
+          .find('img')
+          .attr('src')
+        ||
+        '';
+
+      // Avoid duplicates
+      if (
+        id &&
+        !results.some(
+          anime => anime.id === id
+        )
+      ) {
+
+        results.push({
+
+          id,
+
+          title,
+
+          poster
         });
-
-      const html =
-  await response.text();
-
-console.log(
-  html.slice(0, 15000)
-);
-
-return c.text(html);
-
-      // ---------------------------------
-      // Find anime links
-      // ---------------------------------
-
-      $('a[href*="/anime/"]').each((i, el) => {
-
-        const href =
-          $(el).attr('href') || '';
-
-        const id =
-          href
-            .split('/anime/')
-            .pop()
-            ?.replace(/\//g, '');
-
-        const title =
-          $(el).attr('title')
-          ||
-          $(el).text().trim()
-          ||
-          'Unknown';
-
-        const poster =
-          $(el)
-            .find('img')
-            .attr('data-src')
-          ||
-          $(el)
-            .find('img')
-            .attr('src')
-          ||
-          '';
-
-        if (
-          id &&
-          !results.some(
-            anime => anime.id === id
-          )
-        ) {
-
-          results.push({
-
-            id,
-
-            title,
-
-            poster
-          });
-        }
-      });
-
-      return c.json({
-
-        success: true,
-
-        data: results
-      });
+      }
     }
+  });
 
+  console.log(
+    '[SEARCH RESULTS]',
+    results.length
+  );
+
+  return c.json({
+
+    success: true,
+
+    total:
+      results.length,
+
+    data: results
+  });
+}
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
