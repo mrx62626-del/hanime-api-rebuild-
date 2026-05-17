@@ -187,10 +187,13 @@ $('.item').each((i, el) => {
 
   const link =
     $(el)
-      .find('.ani_poster a');
+      .find('a[href*="/watch/"]')
+      .first();
 
   const href =
     link.attr('href') || '';
+
+  console.log('HREF:', href);
 
   // Example:
   // /watch/naruto-xyz/ep-1
