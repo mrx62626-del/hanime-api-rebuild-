@@ -186,16 +186,19 @@ $('#list-items .item').each((i, el) => {
   const href =
     link.attr('href') || '';
 
+  // Example:
+  // /watch/naruto-xyz/ep-1
+
   const id =
     href
       .split('/watch/')
       .pop()
-      ?.replace(/\//g, '')
+      ?.split('/')[0]
     || '';
 
   const title =
     $(el)
-      .find('.ani_detail .ani_name')
+      .find('.ani_name')
       .text()
       .trim()
 
@@ -234,7 +237,6 @@ $('#list-items .item').each((i, el) => {
       .text()
       .replace(/\D/g, '');
 
-  // Avoid duplicates
   if (
     id &&
     !results.some(
@@ -260,21 +262,6 @@ $('#list-items .item').each((i, el) => {
       }
     });
   }
-});
-
-console.log(
-  '[SEARCH RESULTS]',
-  results.length
-);
-
-return c.json({
-
-  success: true,
-
-  total:
-    results.length,
-
-  data: results
 });
 }
     
