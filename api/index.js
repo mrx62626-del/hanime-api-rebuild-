@@ -206,18 +206,33 @@ $('.item').each((i, el) => {
     || '';
 
   const title =
-    $(el)
-      .find('.ani_name')
-      .text()
-      .trim()
 
-    ||
+  $(el)
+    .find('h3')
+    .first()
+    .text()
+    .trim()
 
-    link.attr('title')
+  ||
 
-    ||
+  $(el)
+    .find('.name')
+    .text()
+    .trim()
 
-    'Unknown';
+  ||
+
+  $(el)
+    .find('a[title]')
+    .attr('title')
+
+  ||
+
+  link.attr('title')
+
+  ||
+
+  'Unknown';
 
   const poster =
     $(el)
