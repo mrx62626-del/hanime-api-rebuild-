@@ -101,7 +101,7 @@ app.get('/api/v2/:provider/search', async (c) => {
     }
 
     // ---------------------------------
-    // Anikoto search
+    // Anikoto Search
     // ---------------------------------
 
     if (providerName === 'anikoto') {
@@ -111,29 +111,17 @@ app.get('/api/v2/:provider/search', async (c) => {
 
       const response =
         await fetch(url, {
-      
+
           headers: {
-      
+
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
-      
+
             'Accept':
               'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      
-            'Accept-Language':
-              'en-US,en;q=0.9',
-      
+
             'Referer':
-              'https://anikoto.cz/',
-      
-            'Origin':
-              'https://anikoto.cz',
-      
-            'Cache-Control':
-              'no-cache',
-      
-            'Pragma':
-              'no-cache'
+              'https://anikoto.cz/'
           }
         });
 
@@ -146,72 +134,64 @@ app.get('/api/v2/:provider/search', async (c) => {
       const results = [];
 
       // ---------------------------------
-      // Parse anime cards
+      // Find anime links
       // ---------------------------------
 
-$('a').each((i, el) => {
+      $('a[href*="/anime/"]').each((i, el) => {
 
-  const href =
-    $(el).attr('href') || '';
+        const href =
+          $(el).attr('href') || '';
 
-  // Match anime URLs only
-  if (
-    href.includes('/anime/')
-  ) {
+        const id =
+          href
+            .split('/anime/')
+            .pop()
+            ?.replace(/\//g, '');
 
-    const title =
-      $(el)
-      .attr('title')
-      ||
-      $(el)
-      .text()
-      .trim();
+        const title =
+          $(el).attr('title')
+          ||
+          $(el).text().trim()
+          ||
+          'Unknown';
 
-    const img =
-      $(el)
-      .find('img');
+        const poster =
+          $(el)
+            .find('img')
+            .attr('data-src')
+          ||
+          $(el)
+            .find('img')
+            .attr('src')
+          ||
+          '';
 
-    const poster =
-      img.attr('data-src')
-      ||
-      img.attr('src')
-      ||
-      '';
+        if (
+          id &&
+          !results.some(
+            anime => anime.id === id
+          )
+        ) {
 
-    const id =
-      href
-        .split('/anime/')
-        .pop()
-        ?.replace(/\//g, '')
-      || '';
+          results.push({
 
-    // Avoid duplicates
-    if (
-      id &&
-      !results.some(
-        a => a.id === id
-      )
-    ) {
+            id,
 
-      results.push({
+            title,
 
-        id,
+            poster
+          });
+        }
+      });
 
-        title,
+      return c.json({
 
-        poster
+        success: true,
+
+        data: results
       });
     }
-  }
-});
 
-return c.json({
-
-  success: true,
-
-  data: results
-});
-    }
     // ---------------------------------
     // Unsupported provider
     // ---------------------------------
